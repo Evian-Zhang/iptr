@@ -1,0 +1,301 @@
+use crate::{
+    HandlePacket,
+    error::{DecoderError, DecoderResult},
+    raw_packet_handler::{RawPacketHandler, RawPacketHandlers},
+};
+
+impl<H: HandlePacket> RawPacketHandlers<H> {
+    const LEVEL1_HANDLERS: [RawPacketHandler<H>; 256] = const {
+        let mut handlers: [RawPacketHandler<H>; 256] = [handle_pad_packet::<H>; 256];
+
+        let mut index = 0;
+
+        loop {
+            if index >= 256 {
+                break;
+            }
+            let cur_index = index;
+            index += 1;
+
+            let handler = if cur_index == 0b00000000 {
+                // 00000000
+                handle_pad_packet::<H>
+            } else if cur_index & 0b00011111 == 0b00000001 {
+                // xxx00001
+                handle_tip_pgd_packet::<H>
+            } else if cur_index == 0b00000010 {
+                // 00000010
+                handle_level2_packet::<H>
+            } else if cur_index & 0b00000011 == 0b00000011 {
+                // xxxxxx11
+                handle_cyc_packet::<H>
+            } else if cur_index & 0b00000001 == 0b00000000 {
+                // xxxxxxx0 but not 00000000 and 00000010
+                handle_short_tnt_packet::<H>
+            } else if cur_index & 0b00011111 == 0b00001101 {
+                // xxx01101
+                handle_tip_packet::<H>
+            } else if cur_index & 0b00011111 == 0b00010001 {
+                // xxx10001
+                handle_tip_pge_packet::<H>
+            } else if cur_index == 0b00011001 {
+                // 00011001
+                handle_tsc_packet::<H>
+            } else if cur_index & 0b00011111 == 0b00011101 {
+                // xxx11101
+                handle_fup_packet::<H>
+            } else if cur_index == 0b01011001 {
+                // 01011001
+                handle_mtc_packet::<H>
+            } else if cur_index == 0b10011001 {
+                // 10011001
+                handle_mode_packet::<H>
+            } else {
+                // Anything else
+                handle_wrong_packet::<H>
+            };
+
+            handlers[cur_index] = handler;
+        }
+
+        handlers
+    };
+}
+
+#[inline(always)]
+fn handle_pad_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    _byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 1;
+
+    loop {
+        handle_packet
+            .on_pad_packet()
+            .map_err(|err| DecoderError::PacketHandler(err))?;
+
+        *pos += packet_length;
+        let Some(byte) = buf.get(*pos) else {
+            break;
+        };
+        if *byte != 0b00000000 {
+            break;
+        }
+        // Fast path for continuous PAD packet
+    }
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_short_tnt_packet<H: HandlePacket>(
+    _buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    // The short TNT packets always ends with 0, so leading zeros will never be 7;
+    // The 0b00000000 is PAD packet, so leading zeros will never be 8
+    debug_assert!(byte.leading_zeros() <= 6, "Unexpected short TNT packet!");
+
+    let packet_length = 1;
+
+    let highest_bit = 6 - byte.leading_zeros();
+    handle_packet
+        .on_short_tnt_packet(byte, highest_bit)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    *pos += packet_length;
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_tip_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_tip_pgd_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_tip_pge_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_level2_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_fup_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_cyc_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    let mut exp = (byte & 0b00000100) != 0;
+    let mut end_pos = *pos + 1;
+
+    loop {
+        if !exp {
+            break;
+        }
+        let Some(byte) = buf.get(end_pos) else {
+            return Err(DecoderError::UnexpectedEOF);
+        };
+        exp = byte % 2 != 0;
+        end_pos += 1;
+    }
+
+    // SAFETY: All bytes are accessed before.
+    handle_packet
+        .on_cyc_packet(unsafe { buf.get_unchecked(*pos..end_pos) })
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    *pos = end_pos;
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_tsc_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    _byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 8;
+
+    let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) = buf.get(*pos..(*pos + 8)) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+    let tsc_bytes = [*byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, 0];
+    let tsc_value = u64::from_le_bytes(tsc_bytes);
+
+    handle_packet
+        .on_tsc_packet(tsc_value)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    *pos += packet_length;
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_mtc_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    _byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 2;
+
+    let Some(byte) = buf.get(*pos + 1) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+    let ctc_payload = *byte;
+
+    handle_packet
+        .on_mtc_packet(ctc_payload)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    *pos += packet_length;
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_mode_packet<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    _byte: u8,
+    handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 2;
+
+    let Some(byte) = buf.get(*pos + 1) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+    let byte = *byte;
+    let leaf_id = (byte & 0b11100000) >> 5;
+    let mode = byte & 0b00011111;
+
+    handle_packet
+        .on_mode_packet(leaf_id, mode)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    *pos += packet_length;
+
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_wrong_packet<H: HandlePacket>(
+    _buf: &[u8],
+    _pos: &mut usize,
+    _byte: u8,
+    _handle_packet: &mut H,
+) -> DecoderResult<(), H> {
+    Err(DecoderError::InvalidPacket)
+}
+
+macro_rules! h {
+    ($byte: ident, $buf: ident, $pos: ident, $packet_handler: ident : $($val:literal),*) => {
+        match *$byte {
+            $(
+                $val => RawPacketHandlers::<H>::LEVEL1_HANDLERS[$val]($buf, $pos, *$byte, $packet_handler),
+            )*
+        }
+    };
+}
+
+pub fn decode<H: HandlePacket>(
+    buf: &[u8],
+    pos: &mut usize,
+    packet_handler: &mut H,
+) -> DecoderResult<(), H> {
+    loop {
+        let Some(byte) = buf.get(*pos) else {
+            break;
+        };
+        h!(byte, buf, pos, packet_handler: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255)?;
+    }
+
+    Ok(())
+}

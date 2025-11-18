@@ -1,166 +1,45 @@
 pub mod error;
+mod raw_packet_handler;
 
-use std::marker::PhantomData;
+use error::DecoderResult;
 
-use error::Result;
+pub trait HandlePacket {
+    /// Custom error type
+    type Error: std::error::Error;
 
-pub trait HandlePacket {}
+    /// Handle short TNT packet
+    ///
+    /// `packet_byte` is the whole byte of short TNT packet. `highest_bit`
+    /// is the index of highest bit that represents a valid Taken/Not-taken bit.
+    fn on_short_tnt_packet(&mut self, packet_byte: u8, highest_bit: u32)
+    -> Result<(), Self::Error>;
 
-struct RawPacketHandlers<H: HandlePacket> {
-    phantom: PhantomData<H>,
-}
+    /// Handle PAD packet
+    fn on_pad_packet(&mut self) -> Result<(), Self::Error>;
 
-impl<H: HandlePacket> RawPacketHandlers<H> {
-    const HANDLERS: [RawPacketHandler<H>; 256] = const {
-        let mut handlers: [RawPacketHandler<H>; 256] = [handle_pad_packet::<H>; 256];
+    /// Handle CYC packet
+    ///
+    /// `cyc_packet` is the total content of the CYC packet
+    fn on_cyc_packet(&mut self, cyc_packet: &[u8]) -> Result<(), Self::Error>;
 
-        let mut index = 0;
+    /// Handle MODE packet
+    ///
+    /// `leaf_id` and `mode` is the leaf ID and mode of MODE packet.
+    fn on_mode_packet(&mut self, leaf_id: u8, mode: u8) -> Result<(), Self::Error>;
 
-        loop {
-            if index >= 256 {
-                break;
-            }
-            let cur_index = index;
-            index += 1;
+    /// Handle MTC packet
+    ///
+    /// `ctc_payload` is the 8-bit CTC payload value
+    fn on_mtc_packet(&mut self, ctc_payload: u8) -> Result<(), Self::Error>;
 
-            let handler = if cur_index == 0b00000000 {
-                // 00000000
-                handle_pad_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00000001 {
-                // xxx00001
-                handle_tip_pgd_packet::<H>
-            } else if cur_index == 0b00000010 {
-                // 00000010
-                handle_level2_packet::<H>
-            } else if cur_index & 0b00000011 == 0b00000011 {
-                // xxxxxx11
-                handle_cyc_packet::<H>
-            } else if cur_index & 0b00000001 == 0b00000000 {
-                // xxxxxxx0 but not 00000000 and 00000010
-                handle_short_tnt_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00001101 {
-                // xxx01101
-                handle_tip_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00010001 {
-                // xxx10001
-                handle_tip_pge_packet::<H>
-            } else if cur_index == 0b00011001 {
-                // 00011001
-                handle_tsc_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00011101 {
-                // xxx11101
-                handle_fup_packet::<H>
-            } else if cur_index == 0b01011001 {
-                // 01011001
-                handle_mtc_packet::<H>
-            } else if cur_index == 0b10011001 {
-                // 10011001
-                handle_mode_packet::<H>
-            } else {
-                // Anything else
-                handle_wrong_packet::<H>
-            };
-
-            handlers[cur_index] = handler;
-        }
-
-        handlers
-    };
+    /// Handle TSC packet
+    ///
+    /// `tsc_value` is the lower 7 bytes of current TSC value
+    fn on_tsc_packet(&mut self, tsc_value: u64) -> Result<(), Self::Error>;
 }
 
-type RawPacketHandler<H> = fn(buf: &[u8], pos: &mut usize, packet_handler: &mut H) -> Result<()>;
-
-fn handle_pad_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_tip_pgd_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_tip_pge_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_level2_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_cyc_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_short_tnt_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_tip_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_tsc_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_fup_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_mtc_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_mode_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-fn handle_wrong_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    handle_packet: &mut H,
-) -> Result<()> {
-    Ok(())
-}
-
-pub fn decode<H: HandlePacket>(buf: &[u8], packet_handler: &mut H) {
+pub fn decode<H: HandlePacket>(buf: &[u8], packet_handler: &mut H) -> DecoderResult<(), H> {
     let mut pos = 0;
-    loop {
-        let Some(byte) = buf.get(pos) else {
-            break;
-        };
-        let _ = RawPacketHandlers::<H>::HANDLERS[*byte as usize](buf, &mut pos, packet_handler);
-    }
+
+    raw_packet_handler::level1::decode(buf, &mut pos, packet_handler)
 }
