@@ -1,12 +1,14 @@
+use std::hint::unreachable_unchecked;
+
 use crate::{
-    HandlePacket,
+    DecoderContext, HandlePacket, TraceeMode,
     error::{DecoderError, DecoderResult},
     raw_packet_handler::{RawPacketHandler, RawPacketHandlers},
 };
 
 impl<H: HandlePacket> RawPacketHandlers<H> {
     const LEVEL1_HANDLERS: [RawPacketHandler<H>; 256] = const {
-        let mut handlers: [RawPacketHandler<H>; 256] = [handle_pad_packet::<H>; 256];
+        let mut handlers: [RawPacketHandler<H>; 256] = [handle_wrong_packet::<H>; 256];
 
         let mut index = 0;
 
@@ -65,19 +67,19 @@ impl<H: HandlePacket> RawPacketHandlers<H> {
 #[inline(always)]
 fn handle_pad_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     _byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     let packet_length = 1;
 
     loop {
-        handle_packet
+        packet_handler
             .on_pad_packet()
             .map_err(|err| DecoderError::PacketHandler(err))?;
 
-        *pos += packet_length;
-        let Some(byte) = buf.get(*pos) else {
+        context.pos += packet_length;
+        let Some(byte) = buf.get(context.pos) else {
             break;
         };
         if *byte != 0b00000000 {
@@ -92,22 +94,23 @@ fn handle_pad_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_short_tnt_packet<H: HandlePacket>(
     _buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     // The short TNT packets always ends with 0, so leading zeros will never be 7;
-    // The 0b00000000 is PAD packet, so leading zeros will never be 8
+    // The 0b00000000 is PAD packet, so leading zeros will never be 8, so no need
+    // to check the trailing 1
     debug_assert!(byte.leading_zeros() <= 6, "Unexpected short TNT packet!");
 
     let packet_length = 1;
 
     let highest_bit = 6 - byte.leading_zeros();
-    handle_packet
+    packet_handler
         .on_short_tnt_packet(byte, highest_bit)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
-    *pos += packet_length;
+    context.pos += packet_length;
 
     Ok(())
 }
@@ -115,62 +118,197 @@ fn handle_short_tnt_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_tip_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    context.pos += 1; // Header
+
+    let ip_bytes = byte >> 5;
+    // SAFETY: ip_bytes is not greater than 0b111
+    let ip_reconstruction_pattern = unsafe { ip_reconstruction(buf, ip_bytes, context)? };
+
+    packet_handler
+        .on_tip_packet(ip_reconstruction_pattern)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
     Ok(())
 }
 
 #[inline(always)]
 fn handle_tip_pgd_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    context.pos += 1; // Header
+
+    let ip_bytes = byte >> 5;
+    // SAFETY: ip_bytes is not greater than 0b111
+    let ip_reconstruction_pattern = unsafe { ip_reconstruction(buf, ip_bytes, context)? };
+
+    packet_handler
+        .on_tip_pgd_packet(ip_reconstruction_pattern)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
     Ok(())
 }
 
 #[inline(always)]
 fn handle_tip_pge_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
-    Ok(())
-}
+    context.pos += 1; // Header
 
-#[inline(always)]
-fn handle_level2_packet<H: HandlePacket>(
-    buf: &[u8],
-    pos: &mut usize,
-    byte: u8,
-    handle_packet: &mut H,
-) -> DecoderResult<(), H> {
+    let ip_bytes = byte >> 5;
+    // SAFETY: ip_bytes is not greater than 0b111
+    let ip_reconstruction_pattern = unsafe { ip_reconstruction(buf, ip_bytes, context)? };
+
+    packet_handler
+        .on_tip_pge_packet(ip_reconstruction_pattern)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
     Ok(())
 }
 
 #[inline(always)]
 fn handle_fup_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    context.pos += 1; // Header
+
+    let ip_bytes = byte >> 5;
+    // SAFETY: ip_bytes is not greater than 0b111
+    let ip_reconstruction_pattern = unsafe { ip_reconstruction(buf, ip_bytes, context)? };
+
+    packet_handler
+        .on_fup_packet(ip_reconstruction_pattern)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
     Ok(())
+}
+
+/// Pattern for IP reconstruction
+pub enum IpReconstructionPattern {
+    /// None, IP is out of context
+    OutOfContext,
+    /// IP Payload[15:0]
+    TwoBytesWithLastIp(u16),
+    /// IP Payload[31:0]
+    FourBytesWithLastIp(u32),
+    /// IP Payload[47:0], the upper 2 bytes are guaranteed to be cleared
+    SixBytesExtended(u64),
+    /// IP Payload[47:0], the upper 2 bytes are guaranteed to be cleared
+    SixBytesWithLastIp(u64),
+    /// IP Payload[63:0]
+    EightBytes(u64),
+}
+
+/// pos should be updated by 1 (header) before calling the function
+///
+/// # SAFETY
+///
+/// ip_bytes should be no greater than 0b111
+#[inline(always)]
+unsafe fn ip_reconstruction<H: HandlePacket>(
+    buf: &[u8],
+    ip_bytes: u8,
+    context: &mut DecoderContext,
+) -> DecoderResult<IpReconstructionPattern, H> {
+    debug_assert!(ip_bytes <= 0b111, "Unexpected ip bytes.");
+    let pattern = match ip_bytes {
+        // Header only, no IP payload
+        0b000 => IpReconstructionPattern::OutOfContext,
+        0b001 => {
+            let Some([byte1, byte2]) = buf.get(context.pos..(context.pos + 2)) else {
+                return Err(DecoderError::UnexpectedEOF);
+            };
+            let ip_payload = u16::from_le_bytes([*byte1, *byte2]);
+
+            context.pos += 2;
+
+            IpReconstructionPattern::TwoBytesWithLastIp(ip_payload)
+        }
+        0b010 => {
+            let Some([byte1, byte2, byte3, byte4]) = buf.get(context.pos..(context.pos + 4)) else {
+                return Err(DecoderError::UnexpectedEOF);
+            };
+            let ip_payload = u32::from_le_bytes([*byte1, *byte2, *byte3, *byte4]);
+
+            context.pos += 4;
+
+            IpReconstructionPattern::FourBytesWithLastIp(ip_payload)
+        }
+        0b011 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) =
+                buf.get(context.pos..(context.pos + 6))
+            else {
+                return Err(DecoderError::UnexpectedEOF);
+            };
+            let ip_payload =
+                u64::from_le_bytes([*byte1, *byte2, *byte3, *byte4, *byte5, *byte6, 0, 0]);
+
+            context.pos += 6;
+
+            IpReconstructionPattern::SixBytesExtended(ip_payload)
+        }
+        0b100 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) =
+                buf.get(context.pos..(context.pos + 6))
+            else {
+                return Err(DecoderError::UnexpectedEOF);
+            };
+            let ip_payload =
+                u64::from_le_bytes([*byte1, *byte2, *byte3, *byte4, *byte5, *byte6, 0, 0]);
+
+            context.pos += 6;
+
+            IpReconstructionPattern::SixBytesWithLastIp(ip_payload)
+        }
+        0b110 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+            let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8]) =
+                buf.get(context.pos..(context.pos + 8))
+            else {
+                return Err(DecoderError::UnexpectedEOF);
+            };
+            let ip_payload = u64::from_le_bytes([
+                *byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, *byte8,
+            ]);
+
+            context.pos += 8;
+
+            IpReconstructionPattern::EightBytes(ip_payload)
+        }
+        0b011 | 0b100 | 0b101 | 0b110 | 0b111 => {
+            return Err(DecoderError::InvalidPacket);
+        }
+        _ => {
+            // SAFETY: ip_bytes should be no greater than than 0b111
+            unsafe {
+                unreachable_unchecked();
+            }
+        }
+    };
+
+    Ok(pattern)
 }
 
 #[inline(always)]
 fn handle_cyc_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     let mut exp = (byte & 0b00000100) != 0;
-    let mut end_pos = *pos + 1;
+    let mut end_pos = context.pos + 1;
 
     loop {
         if !exp {
@@ -184,11 +322,12 @@ fn handle_cyc_packet<H: HandlePacket>(
     }
 
     // SAFETY: All bytes are accessed before.
-    handle_packet
-        .on_cyc_packet(unsafe { buf.get_unchecked(*pos..end_pos) })
+    debug_assert!(buf.len() > end_pos, "Unexpected");
+    packet_handler
+        .on_cyc_packet(unsafe { buf.get_unchecked(context.pos..end_pos) })
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
-    *pos = end_pos;
+    context.pos = end_pos;
 
     Ok(())
 }
@@ -196,23 +335,25 @@ fn handle_cyc_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_tsc_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     _byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     let packet_length = 8;
 
-    let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) = buf.get(*pos..(*pos + 8)) else {
+    let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) =
+        buf.get((context.pos + 1)..(context.pos + 9))
+    else {
         return Err(DecoderError::UnexpectedEOF);
     };
     let tsc_bytes = [*byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, 0];
     let tsc_value = u64::from_le_bytes(tsc_bytes);
 
-    handle_packet
+    packet_handler
         .on_tsc_packet(tsc_value)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
-    *pos += packet_length;
+    context.pos += packet_length;
 
     Ok(())
 }
@@ -220,22 +361,22 @@ fn handle_tsc_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_mtc_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     _byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     let packet_length = 2;
 
-    let Some(byte) = buf.get(*pos + 1) else {
+    let Some(byte) = buf.get(context.pos + 1) else {
         return Err(DecoderError::UnexpectedEOF);
     };
     let ctc_payload = *byte;
 
-    handle_packet
+    packet_handler
         .on_mtc_packet(ctc_payload)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
-    *pos += packet_length;
+    context.pos += packet_length;
 
     Ok(())
 }
@@ -243,24 +384,34 @@ fn handle_mtc_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_mode_packet<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
     _byte: u8,
-    handle_packet: &mut H,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     let packet_length = 2;
 
-    let Some(byte) = buf.get(*pos + 1) else {
+    let Some(byte) = buf.get(context.pos + 1) else {
         return Err(DecoderError::UnexpectedEOF);
     };
     let byte = *byte;
     let leaf_id = (byte & 0b11100000) >> 5;
     let mode = byte & 0b00011111;
 
-    handle_packet
+    if leaf_id == 0b000 {
+        // MODE.exec packet
+        match mode & 0b00000011 {
+            0b00 => context.tracee_mode = TraceeMode::Mode16,
+            0b01 => context.tracee_mode = TraceeMode::Mode64,
+            0b10 => context.tracee_mode = TraceeMode::Mode32,
+            _ => {}
+        }
+    }
+
+    packet_handler
         .on_mode_packet(leaf_id, mode)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
-    *pos += packet_length;
+    context.pos += packet_length;
 
     Ok(())
 }
@@ -268,18 +419,31 @@ fn handle_mode_packet<H: HandlePacket>(
 #[inline(always)]
 fn handle_wrong_packet<H: HandlePacket>(
     _buf: &[u8],
-    _pos: &mut usize,
     _byte: u8,
-    _handle_packet: &mut H,
+    _context: &mut DecoderContext,
+    _packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     Err(DecoderError::InvalidPacket)
 }
 
+#[inline(always)]
+fn handle_level2_packet<H: HandlePacket>(
+    buf: &[u8],
+    _byte: u8,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
+) -> DecoderResult<(), H> {
+    // All pos should be updated by level2's decode
+    super::level2::decode(buf, context, packet_handler)?;
+
+    Ok(())
+}
+
 macro_rules! h {
-    ($byte: ident, $buf: ident, $pos: ident, $packet_handler: ident : $($val:literal),*) => {
-        match *$byte {
+    ($byte: ident, $buf: ident, $context: ident, $packet_handler: ident : $($val:literal),*) => {
+        match $byte {
             $(
-                $val => RawPacketHandlers::<H>::LEVEL1_HANDLERS[$val]($buf, $pos, *$byte, $packet_handler),
+                $val => RawPacketHandlers::<H>::LEVEL1_HANDLERS[$val]($buf, $byte, $context, $packet_handler),
             )*
         }
     };
@@ -287,14 +451,16 @@ macro_rules! h {
 
 pub fn decode<H: HandlePacket>(
     buf: &[u8],
-    pos: &mut usize,
+    context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
     loop {
-        let Some(byte) = buf.get(*pos) else {
+        let Some(byte) = buf.get(context.pos) else {
             break;
         };
-        h!(byte, buf, pos, packet_handler: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255)?;
+        let byte = *byte;
+        // Note that context.pos has not been updated before calling dispatch functions
+        h!(byte, buf, context, packet_handler: 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255)?;
     }
 
     Ok(())
