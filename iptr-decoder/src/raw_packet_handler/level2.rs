@@ -1,5 +1,7 @@
 use std::hint::unreachable_unchecked;
 
+use derive_more::Display;
+
 use crate::{
     DecoderContext, HandlePacket,
     error::{DecoderError, DecoderResult},
@@ -140,6 +142,7 @@ fn handle_trace_stop_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[expect(clippy::int_plus_one)]
 #[inline(always)]
 fn handle_long_tnt_packet<H: HandlePacket>(
     buf: &[u8],
@@ -286,8 +289,11 @@ fn handle_tma_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[derive(Debug, Display)]
 pub enum PtwPayload {
+    #[display("FourBytes({_0:#x})")]
     FourBytes(u32),
+    #[display("EightBytes({_0:#x})")]
     EightBytes(u64),
 }
 

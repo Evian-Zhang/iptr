@@ -4,3 +4,14 @@ members = ["iptr-decoder"]
 
 [workspace.dependencies]
 thiserror = "2"
+derive_more = "2"
+perfect-derive = "0.1"
+memchr = "2.7"
+log = "0.4"
+env_logger = "0.11"
+clap = "4"
+anyhow = "1"
+
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,8 +1,9 @@
 pub mod error;
 mod raw_packet_handler;
 
-use error::DecoderResult;
 pub use raw_packet_handler::{level1::IpReconstructionPattern, level2::PtwPayload};
+
+use crate::error::{DecoderError, DecoderResult};
 
 pub trait HandlePacket {
     /// Custom error type
@@ -183,8 +184,17 @@ pub fn decode<H: HandlePacket>(
     tracee_mode: TraceeMode,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    const PSB_BYTES: [u8; 16] = [
+        0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02,
+        0x82,
+    ];
+
+    let Some(start_pos) = memchr::memmem::find(buf, &PSB_BYTES) else {
+        return Err(DecoderError::NoPsb);
+    };
+
     let mut context = DecoderContext {
-        pos: 0,
+        pos: start_pos,
         tracee_mode,
     };
 

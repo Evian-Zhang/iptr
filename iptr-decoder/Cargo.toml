@@ -5,3 +5,12 @@ edition = "2024"
 
 [dependencies]
 thiserror = { workspace = true }
+derive_more = { workspace = true, features = ["display"] }
+memchr = { workspace = true }
+perfect-derive = { workspace = true }
+
+[dev-dependencies]
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }

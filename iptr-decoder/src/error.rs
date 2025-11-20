@@ -1,8 +1,10 @@
+use perfect_derive::perfect_derive;
 use thiserror::Error;
 
 use crate::HandlePacket;
 
-#[derive(Error, Debug)]
+#[derive(Error)]
+#[perfect_derive(Debug)]
 pub enum DecoderError<H: HandlePacket> {
     /// Packet handler error
     #[error("Packet handler error")]
@@ -10,6 +12,12 @@ pub enum DecoderError<H: HandlePacket> {
     /// Invalid packet
     #[error("Invalid packet")]
     InvalidPacket,
+    /// No PSB packet found
+    ///
+    /// The PSB packet is required to be the start position
+    /// for decoding
+    #[error("No PSB packet found")]
+    NoPsb,
     /// Unexpected EOF
     #[error("Unexpected EOF")]
     UnexpectedEOF,
