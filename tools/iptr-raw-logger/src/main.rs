@@ -1,7 +1,7 @@
 use std::{convert::Infallible, path::PathBuf};
 
 use clap::Parser;
-use iptr_decoder::{HandlePacket, TraceeMode};
+use iptr_decoder::{DecodeOptions, HandlePacket};
 
 struct PacketHandlerRawLogger {}
 
@@ -189,6 +189,11 @@ impl HandlePacket for PacketHandlerRawLogger {
         log::trace!("[EVD packet]\tType: {type:#010b}\tPayload: {payload:#x}");
         Ok(())
     }
+
+    fn on_cfe_packet(&mut self, ip_bit: bool, r#type: u8, vector: u8) -> Result<(), Self::Error> {
+        log::trace!("[CFE packet]\tIP bit: {ip_bit}\tType: {type:#010b}\tVector: {vector:#010b}");
+        Ok(())
+    }
 }
 
 #[derive(Parser)]
@@ -206,7 +211,7 @@ fn main() -> anyhow::Result<()> {
     let buf = std::fs::read(&input)?;
     let mut packet_handler = PacketHandlerRawLogger {};
 
-    iptr_decoder::decode(&buf, TraceeMode::Mode64, &mut packet_handler)?;
+    iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler)?;
 
     Ok(())
 }

@@ -162,6 +162,12 @@ pub trait HandlePacket {
     ///
     /// `r#type` is Type[5:0] (upper 2 bits guaranteed cleared), `payload` is Payload[63:0]
     fn on_evd_packet(&mut self, r#type: u8, payload: u64) -> Result<(), Self::Error>;
+
+    /// Handle CFE packet
+    ///
+    /// `ip_bit` is the IP bit, `r#type` is Type[4:0] (upper 3 bits guaranteed cleared),
+    /// `vector` is the Vector[7:0]
+    fn on_cfe_packet(&mut self, ip_bit: bool, r#type: u8, vector: u8) -> Result<(), Self::Error>;
 }
 
 /// Execution mode
@@ -177,22 +183,69 @@ struct DecoderContext {
     tracee_mode: TraceeMode,
 }
 
-/// Decode.
+/// Options for [`decode`].
 ///
-/// `tracee_mode` is the default mode of tracee before encountering
-/// any valid MODE.exec packets.
+/// You can create default options via [`DecodeOptions::default`].
+pub struct DecodeOptions {
+    tracee_mode: TraceeMode,
+    no_sync: bool,
+}
+
+impl Default for DecodeOptions {
+    fn default() -> Self {
+        Self {
+            tracee_mode: TraceeMode::Mode64,
+            no_sync: false,
+        }
+    }
+}
+
+impl DecodeOptions {
+    /// Set default mode of tracee before encountering any valid MODE.exec packets.
+    ///
+    /// Default is [`TraceeMode::Mode64`]
+    pub fn tracee_mode(&mut self, tracee_mode: TraceeMode) -> &mut Self {
+        self.tracee_mode = tracee_mode;
+        self
+    }
+
+    /// Set whether the decoder will firstly sync forward for a PSB packet instead of
+    /// decoding at 0 offset.
+    ///
+    /// Default is `true`.
+    pub fn sync(&mut self, sync: bool) -> &mut Self {
+        self.no_sync = !sync;
+        self
+    }
+}
+
+/// Decode the given Intel PT buffer.
+///
+/// Note that the Linux Perf tool records more than raw Intel PT packets,
+/// some sideband data is also recorded. As a result, you need to extract AUX data
+/// from the `perf.data` in order to use this method.
 pub fn decode<H: HandlePacket>(
     buf: &[u8],
-    tracee_mode: TraceeMode,
+    options: DecodeOptions,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    let DecodeOptions {
+        tracee_mode,
+        no_sync,
+    } = options;
+
     const PSB_BYTES: [u8; 16] = [
         0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02,
         0x82,
     ];
 
-    let Some(start_pos) = memchr::memmem::find(buf, &PSB_BYTES) else {
-        return Err(DecoderError::NoPsb);
+    let start_pos = if no_sync {
+        0
+    } else {
+        let Some(start_pos) = memchr::memmem::find(buf, &PSB_BYTES) else {
+            return Err(DecoderError::NoPsb);
+        };
+        start_pos
     };
 
     let mut context = DecoderContext {

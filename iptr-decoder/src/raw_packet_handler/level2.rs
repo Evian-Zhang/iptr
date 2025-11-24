@@ -471,12 +471,26 @@ fn handle_bep_packet<H: HandlePacket>(
 
 #[inline(always)]
 fn handle_cfe_packet<H: HandlePacket>(
-    _buf: &[u8],
-    _byte: u8,
-    _context: &mut DecoderContext,
-    _packet_handler: &mut H,
+    buf: &[u8],
+    byte: u8,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
-    Err(DecoderError::Unimplemented)
+    let packet_length = 2;
+
+    let ip_bit = (byte & 0b10000000) != 0;
+    let r#type = byte & 0b00011111;
+    let Some(vector) = buf.get(context.pos + 3) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+
+    packet_handler
+        .on_cfe_packet(ip_bit, r#type, *vector)
+        .map_err(|err| DecoderError::PacketHandler(err))?;
+
+    context.pos += packet_length;
+
+    Ok(())
 }
 
 #[inline(always)]
