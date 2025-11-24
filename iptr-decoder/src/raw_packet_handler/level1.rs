@@ -1,4 +1,4 @@
-use std::hint::unreachable_unchecked;
+use core::hint::unreachable_unchecked;
 
 use derive_more::Display;
 
@@ -351,7 +351,7 @@ fn handle_tsc_packet<H: HandlePacket>(
     let packet_length = 8;
 
     let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) =
-        buf.get((context.pos + 1)..(context.pos + 9))
+        buf.get((context.pos + 1)..(context.pos + 8))
     else {
         return Err(DecoderError::UnexpectedEOF);
     };

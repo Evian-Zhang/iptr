@@ -15,7 +15,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[Short TNT packet]\tpacket byte: {packet_byte:#b}\thighest bit: {highest_bit}"
+            "[Short TNT packet]\tpacket byte: {packet_byte:#010b}\thighest bit: {highest_bit}"
         );
         Ok(())
     }
@@ -26,7 +26,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[Long TNT packet]\tpacket bytes: {packet_bytes:#b}\thighest bit: {highest_bit}"
+            "[Long TNT packet]\tpacket bytes: {packet_bytes:#010b}\thighest bit: {highest_bit}"
         );
         Ok(())
     }
@@ -73,7 +73,7 @@ impl HandlePacket for PacketHandlerRawLogger {
             "[CYC packet]\t{}",
             cyc_packet
                 .iter()
-                .map(|byte| format!("{byte:#b}"))
+                .map(|byte| format!("{byte:#010b}"))
                 .collect::<Vec<_>>()
                 .join(", ")
         );
@@ -81,27 +81,29 @@ impl HandlePacket for PacketHandlerRawLogger {
     }
 
     fn on_mode_packet(&mut self, leaf_id: u8, mode: u8) -> Result<(), Self::Error> {
-        log::trace!("[MODE packet]\tLeaf ID: {leaf_id:#b}\tmode:{mode:#b}");
+        log::trace!("[MODE packet]\tLeaf ID: {leaf_id:#010b}\tmode:{mode:#010b}");
         Ok(())
     }
 
     fn on_mtc_packet(&mut self, ctc_payload: u8) -> Result<(), Self::Error> {
-        log::trace!("[MTC packet]\tCTC: {ctc_payload:#b}");
+        log::trace!("[MTC packet]\tCTC: {ctc_payload:#010b}");
         Ok(())
     }
 
     fn on_tsc_packet(&mut self, tsc_value: u64) -> Result<(), Self::Error> {
-        log::trace!("[TSC packet]\tTSC: {tsc_value:#b}");
+        log::trace!("[TSC packet]\tTSC: {tsc_value:#066b}");
         Ok(())
     }
 
     fn on_cbr_packet(&mut self, core_bus_ratio: u8) -> Result<(), Self::Error> {
-        log::trace!("[CBR packet]\tCore:Bus Ratio: {core_bus_ratio:#b}");
+        log::trace!("[CBR packet]\tCore:Bus Ratio: {core_bus_ratio:#010b}");
         Ok(())
     }
 
     fn on_tma_packet(&mut self, ctc: u16, fast_counter: u8, fc8: bool) -> Result<(), Self::Error> {
-        log::trace!("[TMA packet]\tCTC: {ctc:#b}\tFast Counter: {fast_counter:#b}\tFC8: {fc8}");
+        log::trace!(
+            "[TMA packet]\tCTC: {ctc:#18b}\tFast Counter: {fast_counter:#010b}\tFC8: {fc8}"
+        );
         Ok(())
     }
 
@@ -155,7 +157,7 @@ impl HandlePacket for PacketHandlerRawLogger {
     }
 
     fn on_mwait_packet(&mut self, mwait_hints: u8, ext: u8) -> Result<(), Self::Error> {
-        log::trace!("[MWAIT packet]\tMWAIT hints: {mwait_hints:#b}\tEXT: {ext:#b}");
+        log::trace!("[MWAIT packet]\tMWAIT hints: {mwait_hints:#010b}\tEXT: {ext:#010b}");
         Ok(())
     }
 
@@ -166,7 +168,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         resolved_thread_sub_c_state: u8,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[PWRE packet]\tHW: {hw}\tResolved Thread C-State: {resolved_thread_c_state:#b}\tResolved Thread Sub C-State: {resolved_thread_sub_c_state:#b}"
+            "[PWRE packet]\tHW: {hw}\tResolved Thread C-State: {resolved_thread_c_state:#010b}\tResolved Thread Sub C-State: {resolved_thread_sub_c_state:#010b}"
         );
         Ok(())
     }
@@ -178,13 +180,13 @@ impl HandlePacket for PacketHandlerRawLogger {
         wake_reason: u8,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[PWRX packet]\tLast Core C-State: {last_core_c_state:#b}\tDeepest Core C-State: {deepest_core_c_state:#b}\tWake Reason: {wake_reason:#b}"
+            "[PWRX packet]\tLast Core C-State: {last_core_c_state:#010b}\tDeepest Core C-State: {deepest_core_c_state:#010b}\tWake Reason: {wake_reason:#010b}"
         );
         Ok(())
     }
 
     fn on_evd_packet(&mut self, r#type: u8, payload: u64) -> Result<(), Self::Error> {
-        log::trace!("[EVD packet]\tType: {type:#b}\tPayload: {payload:#x}");
+        log::trace!("[EVD packet]\tType: {type:#010b}\tPayload: {payload:#x}");
         Ok(())
     }
 }

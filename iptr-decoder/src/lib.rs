@@ -1,3 +1,5 @@
+#![no_std]
+
 pub mod error;
 mod raw_packet_handler;
 
@@ -7,7 +9,7 @@ use crate::error::{DecoderError, DecoderResult};
 
 pub trait HandlePacket {
     /// Custom error type
-    type Error: std::error::Error;
+    type Error: core::error::Error;
 
     /// Handle short TNT packet
     ///

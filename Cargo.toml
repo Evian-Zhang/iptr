@@ -1,8 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["iptr-decoder"]
+members = ["iptr-decoder", "tools/iptr-raw-logger"]
 
 [workspace.dependencies]
+iptr-decoder = { path = "./iptr-decoder" }
+
 thiserror = "2"
 derive_more = "2"
 perfect-derive = "0.1"

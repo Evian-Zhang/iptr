@@ -1,4 +1,4 @@
-use std::hint::unreachable_unchecked;
+use core::hint::unreachable_unchecked;
 
 use derive_more::Display;
 
@@ -523,77 +523,76 @@ pub fn decode<H: HandlePacket>(
     context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
-    loop {
-        let Some(byte) = buf.get(context.pos) else {
-            break;
-        };
-        let byte = *byte;
+    // Here pos + 1 since the pos is unchanged for the first byte in LV1 decode
+    let Some(byte) = buf.get(context.pos + 1) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+    let byte = *byte;
 
-        match byte {
-            0b00000011 => {
-                handle_cbr_packet(buf, byte, context, packet_handler)?;
-            }
-            0b00010010 | 0b00110010 | 0b01010010 | 0b01110010 | 0b10010010 | 0b10110010
-            | 0b11010010 | 0b11110010 => {
-                // xxx10010
-                handle_ptw_packet(buf, byte, context, packet_handler)?;
-            }
-            0b00010011 => {
-                handle_cfe_packet(buf, byte, context, packet_handler)?;
-            }
-            0b00100010 => {
-                handle_pwre_packet(buf, byte, context, packet_handler)?;
-            }
-            0b00100011 => {
-                handle_psbend_packet(buf, byte, context, packet_handler)?;
-            }
-            0b00110011 | 0b10110011 => {
-                // x0110011
-                handle_bep_packet(buf, byte, context, packet_handler)?;
-            }
-            0b01000011 => {
-                handle_pip_packet(buf, byte, context, packet_handler)?;
-            }
-            0b01010011 => {
-                handle_evd_packet(buf, byte, context, packet_handler)?;
-            }
-            0b01100010 | 0b11100010 => {
-                // x1100010
-                handle_exstop_packet(buf, byte, context, packet_handler)?;
-            }
-            0b01100011 => {
-                handle_bbp_packet(buf, byte, context, packet_handler)?;
-            }
-            0b01110011 => {
-                handle_tma_packet(buf, byte, context, packet_handler)?;
-            }
-            0b10000010 => {
-                handle_psb_packet(buf, byte, context, packet_handler)?;
-            }
-            0b10000011 => {
-                handle_trace_stop_packet(buf, byte, context, packet_handler)?;
-            }
-            0b10100010 => {
-                handle_pwrx_packet(buf, byte, context, packet_handler)?;
-            }
-            0b10100011 => {
-                handle_long_tnt_packet(buf, byte, context, packet_handler)?;
-            }
-            0b11000010 => {
-                handle_mwait_packet(buf, byte, context, packet_handler)?;
-            }
-            0b11001000 => {
-                handle_vmcs_packet(buf, byte, context, packet_handler)?;
-            }
-            0b11110011 => {
-                handle_ovf_packet(buf, byte, context, packet_handler)?;
-            }
-            0b11000011 => {
-                handle_mnt_packet(buf, byte, context, packet_handler)?;
-            }
-            _ => {
-                return Err(DecoderError::InvalidPacket);
-            }
+    match byte {
+        0b00000011 => {
+            handle_cbr_packet(buf, byte, context, packet_handler)?;
+        }
+        0b00010010 | 0b00110010 | 0b01010010 | 0b01110010 | 0b10010010 | 0b10110010
+        | 0b11010010 | 0b11110010 => {
+            // xxx10010
+            handle_ptw_packet(buf, byte, context, packet_handler)?;
+        }
+        0b00010011 => {
+            handle_cfe_packet(buf, byte, context, packet_handler)?;
+        }
+        0b00100010 => {
+            handle_pwre_packet(buf, byte, context, packet_handler)?;
+        }
+        0b00100011 => {
+            handle_psbend_packet(buf, byte, context, packet_handler)?;
+        }
+        0b00110011 | 0b10110011 => {
+            // x0110011
+            handle_bep_packet(buf, byte, context, packet_handler)?;
+        }
+        0b01000011 => {
+            handle_pip_packet(buf, byte, context, packet_handler)?;
+        }
+        0b01010011 => {
+            handle_evd_packet(buf, byte, context, packet_handler)?;
+        }
+        0b01100010 | 0b11100010 => {
+            // x1100010
+            handle_exstop_packet(buf, byte, context, packet_handler)?;
+        }
+        0b01100011 => {
+            handle_bbp_packet(buf, byte, context, packet_handler)?;
+        }
+        0b01110011 => {
+            handle_tma_packet(buf, byte, context, packet_handler)?;
+        }
+        0b10000010 => {
+            handle_psb_packet(buf, byte, context, packet_handler)?;
+        }
+        0b10000011 => {
+            handle_trace_stop_packet(buf, byte, context, packet_handler)?;
+        }
+        0b10100010 => {
+            handle_pwrx_packet(buf, byte, context, packet_handler)?;
+        }
+        0b10100011 => {
+            handle_long_tnt_packet(buf, byte, context, packet_handler)?;
+        }
+        0b11000010 => {
+            handle_mwait_packet(buf, byte, context, packet_handler)?;
+        }
+        0b11001000 => {
+            handle_vmcs_packet(buf, byte, context, packet_handler)?;
+        }
+        0b11110011 => {
+            handle_ovf_packet(buf, byte, context, packet_handler)?;
+        }
+        0b11000011 => {
+            handle_mnt_packet(buf, byte, context, packet_handler)?;
+        }
+        _ => {
+            return Err(DecoderError::InvalidPacket);
         }
     }
 

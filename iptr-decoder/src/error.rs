@@ -1,3 +1,5 @@
+use core as std; // workaround for `perfect_derive`
+
 use perfect_derive::perfect_derive;
 use thiserror::Error;
 
@@ -29,4 +31,4 @@ pub enum DecoderError<H: HandlePacket> {
     Unexpected,
 }
 
-pub(crate) type DecoderResult<T, H> = std::result::Result<T, DecoderError<H>>;
+pub(crate) type DecoderResult<T, H> = core::result::Result<T, DecoderError<H>>;
