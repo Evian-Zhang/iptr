@@ -37,8 +37,9 @@ fn handle_pip_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 8;
 
-    let Some([byte2, byte3, byte4, byte5, byte6, byte7]) =
-        buf.get((context.pos + 2)..(context.pos + 8))
+    let Some([byte2, byte3, byte4, byte5, byte6, byte7]) = buf
+        .get((context.pos + 2)..)
+        .and_then(|buf| buf.first_chunk::<6>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
@@ -66,33 +67,13 @@ fn handle_psb_packet<H: HandlePacket>(
 
     let packet_length = 16;
 
-    let Some(
-        [
-            byte0,
-            byte1,
-            byte2,
-            byte3,
-            byte4,
-            byte5,
-            byte6,
-            byte7,
-            byte8,
-            byte9,
-            byte10,
-            byte11,
-            byte12,
-            byte13,
-            byte14,
-            byte15,
-        ],
-    ) = buf.get(context.pos..(context.pos + 16))
+    let Some(bytes) = buf
+        .get(context.pos..)
+        .and_then(|buf| buf.first_chunk::<16>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let psb = u128::from_le_bytes([
-        *byte0, *byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, *byte8, *byte9, *byte10,
-        *byte11, *byte12, *byte13, *byte14, *byte15,
-    ]);
+    let psb = u128::from_le_bytes(*bytes);
     if psb != PSB {
         return Err(DecoderError::InvalidPacket);
     }
@@ -152,14 +133,13 @@ fn handle_long_tnt_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 8;
 
-    let Some([byte0, byte1, byte2, byte3, byte4, byte5, byte6, byte7]) =
-        buf.get(context.pos..(context.pos + 8))
+    let Some(bytes) = buf
+        .get(context.pos..)
+        .and_then(|buf| buf.first_chunk::<8>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let packet = u64::from_le_bytes([
-        *byte0, *byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7,
-    ]);
+    let packet = u64::from_le_bytes(*bytes);
     let leading_zeros = packet.leading_zeros();
     if leading_zeros == 64 - 16 {
         // There is no trailing 1
@@ -188,7 +168,9 @@ fn handle_vmcs_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 7;
 
-    let Some([byte2, byte3, byte4, byte5, byte6]) = buf.get((context.pos + 2)..(context.pos + 7))
+    let Some([byte2, byte3, byte4, byte5, byte6]) = buf
+        .get((context.pos + 2)..)
+        .and_then(|buf| buf.first_chunk::<5>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
@@ -242,7 +224,9 @@ fn handle_mnt_packet<H: HandlePacket>(
             byte9,
             byte10,
         ],
-    ) = buf.get((context.pos + 2)..(context.pos + 11))
+    ) = buf
+        .get((context.pos + 2)..)
+        .and_then(|buf| buf.first_chunk::<9>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
@@ -313,24 +297,25 @@ fn handle_ptw_packet<H: HandlePacket>(
         0b00 => {
             packet_length = 6;
 
-            let Some([byte2, byte3, byte4, byte5]) = buf.get((context.pos + 2)..(context.pos + 6))
+            let Some(bytes) = buf
+                .get((context.pos + 2)..)
+                .and_then(|buf| buf.first_chunk::<4>())
             else {
                 return Err(DecoderError::UnexpectedEOF);
             };
-            let payload = u32::from_le_bytes([*byte2, *byte3, *byte4, *byte5]);
+            let payload = u32::from_le_bytes(*bytes);
             PtwPayload::FourBytes(payload)
         }
         0b01 => {
             packet_length = 10;
 
-            let Some([byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9]) =
-                buf.get((context.pos + 2)..(context.pos + 10))
+            let Some(bytes) = buf
+                .get((context.pos + 2)..)
+                .and_then(|buf| buf.first_chunk::<8>())
             else {
                 return Err(DecoderError::UnexpectedEOF);
             };
-            let payload = u64::from_le_bytes([
-                *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, *byte8, *byte9,
-            ]);
+            let payload = u64::from_le_bytes(*bytes);
             PtwPayload::EightBytes(payload)
         }
         0b10 | 0b11 => {

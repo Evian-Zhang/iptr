@@ -236,28 +236,35 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
         // Header only, no IP payload
         0b000 => IpReconstructionPattern::OutOfContext,
         0b001 => {
-            let Some([byte1, byte2]) = buf.get(context.pos..(context.pos + 2)) else {
+            let Some(bytes) = buf
+                .get(context.pos..)
+                .and_then(|buf| buf.first_chunk::<2>())
+            else {
                 return Err(DecoderError::UnexpectedEOF);
             };
-            let ip_payload = u16::from_le_bytes([*byte1, *byte2]);
+            let ip_payload = u16::from_le_bytes(*bytes);
 
             context.pos += 2;
 
             IpReconstructionPattern::TwoBytesWithLastIp(ip_payload)
         }
         0b010 => {
-            let Some([byte1, byte2, byte3, byte4]) = buf.get(context.pos..(context.pos + 4)) else {
+            let Some(bytes) = buf
+                .get(context.pos..)
+                .and_then(|buf| buf.first_chunk::<4>())
+            else {
                 return Err(DecoderError::UnexpectedEOF);
             };
-            let ip_payload = u32::from_le_bytes([*byte1, *byte2, *byte3, *byte4]);
+            let ip_payload = u32::from_le_bytes(*bytes);
 
             context.pos += 4;
 
             IpReconstructionPattern::FourBytesWithLastIp(ip_payload)
         }
         0b011 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
-            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) =
-                buf.get(context.pos..(context.pos + 6))
+            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) = buf
+                .get(context.pos..)
+                .and_then(|buf| buf.first_chunk::<6>())
             else {
                 return Err(DecoderError::UnexpectedEOF);
             };
@@ -269,8 +276,9 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
             IpReconstructionPattern::SixBytesExtended(ip_payload)
         }
         0b100 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
-            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) =
-                buf.get(context.pos..(context.pos + 6))
+            let Some([byte1, byte2, byte3, byte4, byte5, byte6]) = buf
+                .get(context.pos..)
+                .and_then(|buf| buf.first_chunk::<6>())
             else {
                 return Err(DecoderError::UnexpectedEOF);
             };
@@ -282,14 +290,13 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
             IpReconstructionPattern::SixBytesWithLastIp(ip_payload)
         }
         0b110 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
-            let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8]) =
-                buf.get(context.pos..(context.pos + 8))
+            let Some(bytes) = buf
+                .get(context.pos..)
+                .and_then(|buf| buf.first_chunk::<8>())
             else {
                 return Err(DecoderError::UnexpectedEOF);
             };
-            let ip_payload = u64::from_le_bytes([
-                *byte1, *byte2, *byte3, *byte4, *byte5, *byte6, *byte7, *byte8,
-            ]);
+            let ip_payload = u64::from_le_bytes(*bytes);
 
             context.pos += 8;
 
@@ -350,8 +357,9 @@ fn handle_tsc_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 8;
 
-    let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) =
-        buf.get((context.pos + 1)..(context.pos + 8))
+    let Some([byte1, byte2, byte3, byte4, byte5, byte6, byte7]) = buf
+        .get((context.pos + 1)..)
+        .and_then(|buf| buf.first_chunk::<7>())
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
