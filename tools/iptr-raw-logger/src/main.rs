@@ -1,5 +1,6 @@
-use std::{convert::Infallible, path::PathBuf};
+use std::{convert::Infallible, fs::File, path::PathBuf};
 
+use anyhow::Context;
 use clap::Parser;
 use iptr_decoder::{DecodeOptions, HandlePacket};
 
@@ -196,8 +197,12 @@ impl HandlePacket for PacketHandlerRawLogger {
     }
 }
 
+/// Decode target intel PT packets in the low level and logs all details.
+///
+/// Set the environment variable `RUST_LOG=trace` for logging.
 #[derive(Parser)]
 struct Cmdline {
+    /// Path of intel PT trace
     #[arg(short, long)]
     input: PathBuf,
 }
@@ -207,8 +212,10 @@ fn main() -> anyhow::Result<()> {
 
     let Cmdline { input } = Cmdline::parse();
 
-    // Note that if the trace is huge, consider using mmap
-    let buf = std::fs::read(&input)?;
+    let file = File::open(input).context("Failed to open input file")?;
+    // SAFETY: check the safety requirements of memmap2 documentation
+    let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
+
     let mut packet_handler = PacketHandlerRawLogger {};
 
     iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler)?;

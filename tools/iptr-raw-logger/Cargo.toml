@@ -9,3 +9,4 @@ log = { workspace = true }
 env_logger = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
+memmap2 = { workspace = true }
