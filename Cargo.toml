@@ -1,9 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["iptr-decoder", "tools/iptr-raw-logger"]
+members = ["iptr-decoder", "iptr-edge-analyzer", "tools/iptr-raw-logger"]
 
 [workspace.dependencies]
 iptr-decoder = { path = "./iptr-decoder" }
+iptr-edge-analyzer = { path = "./iptr-edge-analyzer" }
 
 thiserror = "2"
 derive_more = "2"
@@ -14,6 +15,8 @@ env_logger = "0.11"
 clap = "4"
 anyhow = "1"
 memmap2 = "0.9"
+iced-x86 = "1.21"
+hashbrown = "0.16"
 
 [profile.release]
 lto = true

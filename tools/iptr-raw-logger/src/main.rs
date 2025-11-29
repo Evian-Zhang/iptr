@@ -27,7 +27,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[Long TNT packet]\tpacket bytes: {packet_bytes:#010b}\thighest bit: {highest_bit}"
+            "[Long TNT packet]\tpacket bytes: {packet_bytes:#066b}\thighest bit: {highest_bit}"
         );
         Ok(())
     }
@@ -103,7 +103,7 @@ impl HandlePacket for PacketHandlerRawLogger {
 
     fn on_tma_packet(&mut self, ctc: u16, fast_counter: u8, fc8: bool) -> Result<(), Self::Error> {
         log::trace!(
-            "[TMA packet]\tCTC: {ctc:#18b}\tFast Counter: {fast_counter:#010b}\tFC8: {fc8}"
+            "[TMA packet]\tCTC: {ctc:#018b}\tFast Counter: {fast_counter:#010b}\tFC8: {fc8}"
         );
         Ok(())
     }

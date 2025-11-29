@@ -1,0 +1,11 @@
+[package]
+name = "iptr-edge-analyzer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iptr-decoder = { workspace = true }
+thiserror = { workspace = true }
+perfect-derive = { workspace = true }
+iced-x86 = { workspace = true }
+hashbrown = { workspace = true }
