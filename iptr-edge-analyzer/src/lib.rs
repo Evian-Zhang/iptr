@@ -74,6 +74,7 @@ where
         self.control_flow_analyzer.on_short_tnt_packet(
             self.handler,
             self.reader,
+            context,
             packet_byte,
             highest_bit,
         )?;

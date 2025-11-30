@@ -401,6 +401,13 @@ impl DecodeOptions {
 /// Note that the Linux Perf tool records more than raw Intel PT packets,
 /// some sideband data is also recorded. As a result, you need to extract AUX data
 /// from the `perf.data` in order to use this method.
+///
+/// # SAFETY
+///
+/// We assume that you can never construct a buf whose length can overflow a usize.
+/// As a result, we do not check any arithmetic overflow when manipulating the postion
+/// of buf cursor (unless you use a debug-build or enable `overflow-checks` in your
+/// build profile).
 pub fn decode<H: HandlePacket>(
     buf: &[u8],
     options: DecodeOptions,
