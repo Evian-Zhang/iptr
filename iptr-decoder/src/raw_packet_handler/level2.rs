@@ -20,7 +20,7 @@ fn handle_cbr_packet<H: HandlePacket>(
         return Err(DecoderError::UnexpectedEOF);
     };
     packet_handler
-        .on_cbr_packet(*core_bus_ratio)
+        .on_cbr_packet(context, *core_bus_ratio)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -48,7 +48,7 @@ fn handle_pip_packet<H: HandlePacket>(
     let cr3 = u64::from_le_bytes([byte2, *byte3, *byte4, *byte5, *byte6, *byte7, 0, 0]) << 5;
 
     packet_handler
-        .on_pip_packet(cr3, rsvd_nr)
+        .on_pip_packet(context, cr3, rsvd_nr)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -79,7 +79,7 @@ fn handle_psb_packet<H: HandlePacket>(
     }
 
     packet_handler
-        .on_psb_packet()
+        .on_psb_packet(context)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -97,7 +97,7 @@ fn handle_psbend_packet<H: HandlePacket>(
     let packet_length = 2;
 
     packet_handler
-        .on_psbend_packet()
+        .on_psbend_packet(context)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -115,7 +115,7 @@ fn handle_trace_stop_packet<H: HandlePacket>(
     let packet_length = 2;
 
     packet_handler
-        .on_trace_stop_packet()
+        .on_trace_stop_packet(context)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -151,7 +151,7 @@ fn handle_long_tnt_packet<H: HandlePacket>(
     let packet_bytes = packet >> 16;
 
     packet_handler
-        .on_long_tnt_packet(packet_bytes, highest_bit)
+        .on_long_tnt_packet(context, packet_bytes, highest_bit)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -177,7 +177,7 @@ fn handle_vmcs_packet<H: HandlePacket>(
     let vmcs_pointer = u64::from_le_bytes([*byte2, *byte3, *byte4, *byte5, *byte6, 0, 0, 0]) << 12;
 
     packet_handler
-        .on_vmcs_packet(vmcs_pointer)
+        .on_vmcs_packet(context, vmcs_pointer)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -195,7 +195,7 @@ fn handle_ovf_packet<H: HandlePacket>(
     let packet_length = 2;
 
     packet_handler
-        .on_ovf_packet()
+        .on_ovf_packet(context)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -238,7 +238,7 @@ fn handle_mnt_packet<H: HandlePacket>(
     ]);
 
     packet_handler
-        .on_mnt_packet(payload)
+        .on_mnt_packet(context, payload)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -265,7 +265,7 @@ fn handle_tma_packet<H: HandlePacket>(
     let fc8 = *byte6 % 2 != 0;
 
     packet_handler
-        .on_tma_packet(ctc, fast_counter, fc8)
+        .on_tma_packet(context, ctc, fast_counter, fc8)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -330,7 +330,7 @@ fn handle_ptw_packet<H: HandlePacket>(
     };
 
     packet_handler
-        .on_ptw_packet(ip_bit, payload)
+        .on_ptw_packet(context, ip_bit, payload)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -350,7 +350,7 @@ fn handle_exstop_packet<H: HandlePacket>(
     let ip_bit = (byte & 0b10000000) != 0;
 
     packet_handler
-        .on_exstop_packet(ip_bit)
+        .on_exstop_packet(context, ip_bit)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -376,7 +376,7 @@ fn handle_mwait_packet<H: HandlePacket>(
     let ext = *ext & 0b00000011;
 
     packet_handler
-        .on_mwait_packet(*mwait_hints, ext)
+        .on_mwait_packet(context, *mwait_hints, ext)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -401,7 +401,12 @@ fn handle_pwre_packet<H: HandlePacket>(
     let resolved_thread_sub_c_state = *byte3 & 0b00001111;
 
     packet_handler
-        .on_pwre_packet(hw, resolved_thread_c_state, resolved_thread_sub_c_state)
+        .on_pwre_packet(
+            context,
+            hw,
+            resolved_thread_c_state,
+            resolved_thread_sub_c_state,
+        )
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -426,7 +431,12 @@ fn handle_pwrx_packet<H: HandlePacket>(
     let wake_reason = *byte3 & 0b00001111;
 
     packet_handler
-        .on_pwrx_packet(last_core_c_state, deepest_core_c_state, wake_reason)
+        .on_pwrx_packet(
+            context,
+            last_core_c_state,
+            deepest_core_c_state,
+            wake_reason,
+        )
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -470,7 +480,7 @@ fn handle_cfe_packet<H: HandlePacket>(
     };
 
     packet_handler
-        .on_cfe_packet(ip_bit, r#type, *vector)
+        .on_cfe_packet(context, ip_bit, r#type, *vector)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;
@@ -509,7 +519,7 @@ fn handle_evd_packet<H: HandlePacket>(
     ]);
 
     packet_handler
-        .on_evd_packet(r#type, payload)
+        .on_evd_packet(context, r#type, payload)
         .map_err(|err| DecoderError::PacketHandler(err))?;
 
     context.pos += packet_length;

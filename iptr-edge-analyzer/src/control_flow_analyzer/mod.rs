@@ -16,13 +16,13 @@ impl ControlFlowAnalyzer {
         }
     }
 
-    pub fn on_short_tnt_packet<H: HandleControlFlow>(
+    pub fn on_short_tnt_packet<H: HandleControlFlow, R: ReadMemory>(
         &mut self,
         handler: &mut H,
-        reader: &mut impl ReadMemory,
+        reader: &mut R,
         packet_byte: u8,
         highest_bit: u32,
-    ) -> AnalyzerResult<(), H> {
+    ) -> AnalyzerResult<(), H, R> {
         Ok(())
     }
 }

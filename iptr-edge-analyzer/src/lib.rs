@@ -4,7 +4,7 @@ mod error;
 mod memory_reader;
 mod tnt_buffer;
 
-use iptr_decoder::{HandlePacket, IpReconstructionPattern};
+use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 use crate::{
     control_flow_analyzer::ControlFlowAnalyzer, error::AnalyzerError, tnt_buffer::TntBuffer,
@@ -60,13 +60,14 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
 impl<'a, H, R> HandlePacket for EdgeAnalyzer<'a, H, R>
 where
     H: HandleControlFlow,
-    AnalyzerError<H>: std::error::Error,
+    AnalyzerError<H, R>: std::error::Error,
     R: ReadMemory,
 {
-    type Error = AnalyzerError<H>;
+    type Error = AnalyzerError<H, R>;
 
     fn on_short_tnt_packet(
         &mut self,
+        context: &DecoderContext,
         packet_byte: u8,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
