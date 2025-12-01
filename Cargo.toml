@@ -1,10 +1,16 @@
 [workspace]
 resolver = "3"
-members = ["iptr-decoder", "iptr-edge-analyzer", "tools/iptr-raw-logger"]
+members = [
+  "iptr-decoder",
+  "iptr-edge-analyzer",
+  "iptr-perf-pt-reader", "tools/iptr-perf-pt-extractor",
+  "tools/iptr-raw-logger",
+]
 
 [workspace.dependencies]
 iptr-decoder = { path = "./iptr-decoder" }
 iptr-edge-analyzer = { path = "./iptr-edge-analyzer" }
+iptr-perf-pt-reader = { path = "./iptr-perf-pt-reader" }
 
 thiserror = "2"
 derive_more = "2"
@@ -17,6 +23,8 @@ anyhow = "1"
 memmap2 = "0.9"
 iced-x86 = "1.21"
 hashbrown = "0.16"
+linux-perf-data = "0.12"
+byteorder = "1.5" # To use public APIs in linux-perf-data
 
 [profile.release]
 lto = true

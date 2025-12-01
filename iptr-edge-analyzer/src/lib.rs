@@ -1,6 +1,6 @@
 mod control_flow_analyzer;
 mod control_flow_handler;
-mod error;
+pub mod error;
 mod memory_reader;
 mod tnt_buffer;
 

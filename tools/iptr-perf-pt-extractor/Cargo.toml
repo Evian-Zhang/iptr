@@ -1,0 +1,10 @@
+[package]
+name = "iptr-perf-pt-extractor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+iptr-perf-pt-reader = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+memmap2 = { workspace = true }
