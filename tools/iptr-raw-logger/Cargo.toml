@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 iptr-decoder = { workspace = true }
+iptr-perf-pt-reader = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

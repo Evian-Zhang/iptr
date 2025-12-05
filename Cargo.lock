@@ -262,6 +262,7 @@ dependencies = [
  "clap",
  "env_logger",
  "iptr-decoder",
+ "iptr-perf-pt-reader",
  "log",
  "memmap2",
 ]
