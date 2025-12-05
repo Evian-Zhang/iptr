@@ -16,6 +16,9 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
     let (pos, total_size) = read_perf_header(perf_data)?;
     let mut pos = pos as usize;
     let end_pos = pos.saturating_add(total_size as usize);
+    let Some(perf_data) = perf_data.get(0..end_pos) else {
+        return Err(ReaderError::UnexpectedEOF);
+    };
 
     loop {
         if pos >= end_pos {
@@ -33,7 +36,7 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
                 pt_auxtraces.push(auxtrace);
             }
             _ => {
-                pos = cur_pos + perf_event_header.size as usize;
+                pos = cur_pos.saturating_add(perf_event_header.size as usize);
             }
         }
     }
