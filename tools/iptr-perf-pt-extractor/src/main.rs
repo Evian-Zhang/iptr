@@ -15,6 +15,8 @@ struct Cmdline {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let Cmdline { input, output_dir } = Cmdline::parse();
 
     let file = File::open(&input).context("Failed to open input file")?;
@@ -24,12 +26,18 @@ fn main() -> Result<()> {
         .file_name()
         .unwrap_or_else(|| &OsStr::new("perf.data"));
 
-    let mut index = 0;
-    iptr_perf_pt_reader::extract_pt_aux_data(&buf)?;
+    let pt_auxtraces = iptr_perf_pt_reader::extract_pt_auxtraces(&buf)?;
 
-    // let target_path = output_dir.join(format!("{}-aux-idx{index}.bin", origin_filename.display()));
-    // index += 1;
-    // std::fs::write(target_path, aux_data).context("Failed to write")
+    for pt_auxtrace in pt_auxtraces {
+        let target_path = output_dir.join(format!(
+            "{}-aux-idx{}.bin",
+            origin_filename.display(),
+            pt_auxtrace.idx
+        ));
+        std::fs::write(&target_path, pt_auxtrace.auxtrace_data)
+            .context("Failed to write auxtrace data")?;
+        log::info!("Extracted {}", target_path.display());
+    }
 
     Ok(())
 }

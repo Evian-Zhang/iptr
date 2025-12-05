@@ -74,24 +74,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 
 [[package]]
-name = "bitflags"
-version = "2.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812e12b5285cc515a9c72a5c1d3b6d46a19dac5acfef5265968c166106e31dd3"
-
-[[package]]
-name = "byteorder"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
-
-[[package]]
-name = "bytes"
-version = "1.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
-
-[[package]]
 name = "clap"
 version = "4.5.53"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -169,12 +151,6 @@ dependencies = [
  "syn 2.0.111",
  "unicode-xid",
 ]
-
-[[package]]
-name = "either"
-version = "1.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
 name = "env_filter"
@@ -264,7 +240,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "env_logger",
  "iptr-perf-pt-reader",
+ "log",
  "memmap2",
 ]
 
@@ -272,9 +250,7 @@ dependencies = [
 name = "iptr-perf-pt-reader"
 version = "0.1.0"
 dependencies = [
- "byteorder",
  "derive_more",
- "linux-perf-data",
  "thiserror",
 ]
 
@@ -295,15 +271,6 @@ name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
-
-[[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "jiff"
@@ -340,39 +307,6 @@ name = "libc"
 version = "0.2.177"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2874a2af47a2325c2001a6e6fad9b16a53b802102b528163885171cf92b15976"
-
-[[package]]
-name = "linear-map"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfae20f6b19ad527b550c223fddc3077a547fc70cda94b9b566575423fd303ee"
-
-[[package]]
-name = "linux-perf-data"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fab2acdab7737b0c69f86496747f251231321db9141827b53d964f25b150807d"
-dependencies = [
- "byteorder",
- "linear-map",
- "linux-perf-event-reader",
- "memchr",
- "prost",
- "prost-derive",
- "thiserror",
-]
-
-[[package]]
-name = "linux-perf-event-reader"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa8fc7e83909ea3b9e2784591655637d3401f2f16014f9d8d6e23ccd138e665f"
-dependencies = [
- "bitflags",
- "byteorder",
- "memchr",
- "thiserror",
-]
 
 [[package]]
 name = "litrs"
@@ -444,28 +378,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "prost"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "101fec8d036f8d9d4a1e8ebf90d566d1d798f3b1aa379d2576a54a0d9acea5bd"
-dependencies = [
- "bytes",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2d93e596a829ebe00afa41c3a056e6308d6b8a4c7d869edf184e2c91b1ba564"
-dependencies = [
- "anyhow",
- "itertools",
- "proc-macro2",
- "quote",
- "syn 2.0.111",
 ]
 
 [[package]]

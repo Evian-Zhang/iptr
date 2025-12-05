@@ -23,8 +23,6 @@ anyhow = "1"
 memmap2 = "0.9"
 iced-x86 = "1.21"
 hashbrown = "0.16"
-linux-perf-data = "0.12"
-byteorder = "1.5" # To use public APIs in linux-perf-data
 
 [profile.release]
 lto = true
