@@ -22,9 +22,7 @@ fn main() -> Result<()> {
     let file = File::open(&input).context("Failed to open input file")?;
     // SAFETY: check the safety requirements of memmap2 documentation
     let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
-    let origin_filename = input
-        .file_name()
-        .unwrap_or_else(|| &OsStr::new("perf.data"));
+    let origin_filename = input.file_name().unwrap_or_else(|| OsStr::new("perf.data"));
 
     let pt_auxtraces = iptr_perf_pt_reader::extract_pt_auxtraces(&buf)?;
 
