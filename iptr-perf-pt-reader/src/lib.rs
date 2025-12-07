@@ -28,6 +28,10 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
         let Some(perf_event_header) = read_perf_event_header(perf_data, &mut pos) else {
             return Err(ReaderError::UnexpectedEOF);
         };
+        if perf_event_header.size == 0 {
+            // This will lead to infinite loop
+            return Err(ReaderError::InvalidPerfData);
+        }
         match perf_event_header.r#type {
             PERF_RECORD_AUXTRACE => {
                 let Some(auxtrace) = read_auxtrace(perf_data, &mut pos) else {
