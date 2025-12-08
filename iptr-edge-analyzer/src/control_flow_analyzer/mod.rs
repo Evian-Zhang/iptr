@@ -5,8 +5,10 @@ use std::num::NonZero;
 use iptr_decoder::DecoderContext;
 
 use crate::{
-    HandleControlFlow, ReadMemory, control_flow_analyzer::r#static::StaticControlFlowAnalyzer,
-    error::AnalyzerResult,
+    HandleControlFlow, ReadMemory,
+    control_flow_analyzer::r#static::StaticControlFlowAnalyzer,
+    control_flow_handler::ControlFlowTransitionKind,
+    error::{AnalyzerError, AnalyzerResult},
 };
 
 pub struct ControlFlowAnalyzer {
@@ -54,22 +56,40 @@ impl ControlFlowAnalyzer {
                 match terminator {
                     Branch { r#true, r#false } => {
                         last_bb = if is_taken { r#true } else { r#false };
+                        handler
+                            .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
+                            .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
                         break 'cfg_traverse;
                     }
                     DirectGoto { target } => {
                         last_bb = target;
+                        handler
+                            .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
+                            .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
                         continue 'cfg_traverse;
                     }
                     DirectCall { target } => {
                         last_bb = target;
+                        handler
+                            .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
+                            .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
                         continue 'cfg_traverse;
                     }
                     IndirectGotoOrCall => {
                         // Wait for TIP
                         break 'cfg_traverse;
                     }
-                    NearRet => todo!(),
-                    FarTransfers => todo!(),
+                    NearRet => {
+                        if !is_taken {
+                            // If return is not compressed, then an immediate TIP packet will be generated.
+                            // If return is compressed, then a taken bit will be generated
+                            return Err(AnalyzerError::InvalidPacket);
+                        }
+                    }
+                    FarTransfers => {
+                        // Far transfers will always emit FUP packets immediately
+                        return Err(AnalyzerError::InvalidPacket);
+                    }
                 }
             }
         }
