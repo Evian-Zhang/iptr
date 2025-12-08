@@ -37,9 +37,9 @@ pub trait HandlePacket {
     /// `packet_bytes` is the whole 6 bytes of long TNT packet payload. The
     /// upper 2 bytes are guaranteed to be cleared.
     /// `highest_bit` is the index of highest bit that represents a valid
-    /// Taken/Not-taken bit, guaranteed to be in range 0..=46 or u32::MAX
+    /// Taken/Not-taken bit, guaranteed to be in range 0..=46 or [`u32::MAX`]
     ///
-    /// If `highest_bit` is u32::MAX, this means there is no Taken/Not-taken bits.
+    /// If `highest_bit` is [`u32::MAX`], this means there is no Taken/Not-taken bits.
     #[allow(unused)]
     fn on_long_tnt_packet(
         &mut self,
@@ -340,6 +340,7 @@ pub enum TraceeMode {
 
 impl TraceeMode {
     /// Get the bitness of current tracee mode
+    #[must_use]
     pub fn bitness(&self) -> u32 {
         *self as u32
     }
@@ -355,6 +356,7 @@ pub struct DecoderContext {
 
 impl DecoderContext {
     /// Get current tracee mode
+    #[must_use]
     pub fn tracee_mode(&self) -> TraceeMode {
         self.tracee_mode
     }
@@ -363,6 +365,7 @@ impl DecoderContext {
 /// Options for [`decode`].
 ///
 /// You can create default options via [`DecodeOptions::default`].
+#[derive(Clone, Copy)]
 pub struct DecodeOptions {
     tracee_mode: TraceeMode,
     no_sync: bool,
@@ -396,6 +399,10 @@ impl DecodeOptions {
     }
 }
 
+const PSB_BYTES: [u8; 16] = [
+    0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82,
+];
+
 /// Decode the given Intel PT buffer.
 ///
 /// Note that the Linux Perf tool records more than raw Intel PT packets,
@@ -417,11 +424,6 @@ pub fn decode<H: HandlePacket>(
         tracee_mode,
         no_sync,
     } = options;
-
-    const PSB_BYTES: [u8; 16] = [
-        0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02, 0x82, 0x02,
-        0x82,
-    ];
 
     let start_pos = if no_sync {
         0

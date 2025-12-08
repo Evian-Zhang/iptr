@@ -21,37 +21,37 @@ impl<H: HandlePacket> RawPacketHandlers<H> {
             let cur_index = index;
             index += 1;
 
-            let handler = if cur_index == 0b00000000 {
+            let handler = if cur_index == 0b0000_0000 {
                 // 00000000
                 handle_pad_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00000001 {
+            } else if cur_index & 0b0001_1111 == 0b0000_0001 {
                 // xxx00001
                 handle_tip_pgd_packet::<H>
-            } else if cur_index == 0b00000010 {
+            } else if cur_index == 0b0000_0010 {
                 // 00000010
                 handle_level2_packet::<H>
-            } else if cur_index & 0b00000011 == 0b00000011 {
+            } else if cur_index & 0b0000_0011 == 0b0000_0011 {
                 // xxxxxx11
                 handle_cyc_packet::<H>
-            } else if cur_index & 0b00000001 == 0b00000000 {
+            } else if cur_index & 0b0000_0001 == 0b0000_0000 {
                 // xxxxxxx0 but not 00000000 and 00000010
                 handle_short_tnt_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00001101 {
+            } else if cur_index & 0b0001_1111 == 0b0000_1101 {
                 // xxx01101
                 handle_tip_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00010001 {
+            } else if cur_index & 0b0001_1111 == 0b0001_0001 {
                 // xxx10001
                 handle_tip_pge_packet::<H>
-            } else if cur_index == 0b00011001 {
+            } else if cur_index == 0b0001_1001 {
                 // 00011001
                 handle_tsc_packet::<H>
-            } else if cur_index & 0b00011111 == 0b00011101 {
+            } else if cur_index & 0b0001_1111 == 0b0001_1101 {
                 // xxx11101
                 handle_fup_packet::<H>
-            } else if cur_index == 0b01011001 {
+            } else if cur_index == 0b0101_1001 {
                 // 01011001
                 handle_mtc_packet::<H>
-            } else if cur_index == 0b10011001 {
+            } else if cur_index == 0b1001_1001 {
                 // 10011001
                 handle_mode_packet::<H>
             } else {
@@ -66,7 +66,6 @@ impl<H: HandlePacket> RawPacketHandlers<H> {
     };
 }
 
-#[inline(always)]
 fn handle_pad_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -84,7 +83,7 @@ fn handle_pad_packet<H: HandlePacket>(
         let Some(byte) = buf.get(context.pos) else {
             break;
         };
-        if *byte != 0b00000000 {
+        if *byte != 0b0000_0000 {
             break;
         }
         // Fast path for continuous PAD packet
@@ -93,7 +92,6 @@ fn handle_pad_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_short_tnt_packet<H: HandlePacket>(
     _buf: &[u8],
     byte: u8,
@@ -117,7 +115,6 @@ fn handle_short_tnt_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_tip_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -137,7 +134,6 @@ fn handle_tip_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_tip_pgd_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -157,7 +153,6 @@ fn handle_tip_pgd_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_tip_pge_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -177,7 +172,6 @@ fn handle_tip_pge_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_fup_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -198,7 +192,7 @@ fn handle_fup_packet<H: HandlePacket>(
 }
 
 /// Pattern for IP reconstruction
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone, Copy)]
 pub enum IpReconstructionPattern {
     /// None, IP is out of context
     OutOfContext,
@@ -223,9 +217,8 @@ pub enum IpReconstructionPattern {
 ///
 /// # SAFETY
 ///
-/// ip_bytes should be no greater than 0b111
+/// `ip_bytes` should be no greater than 0b111
 #[expect(clippy::manual_range_patterns)]
-#[inline(always)]
 unsafe fn ip_reconstruction<H: HandlePacket>(
     buf: &[u8],
     ip_bytes: u8,
@@ -316,14 +309,13 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
     Ok(pattern)
 }
 
-#[inline(always)]
 fn handle_cyc_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
     context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
-    let mut exp = (byte & 0b00000100) != 0;
+    let mut exp = (byte & 0b0000_0100) != 0;
     let mut end_pos = context.pos + 1;
 
     loop {
@@ -348,7 +340,6 @@ fn handle_cyc_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_tsc_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -375,7 +366,6 @@ fn handle_tsc_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_mtc_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -398,7 +388,6 @@ fn handle_mtc_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_mode_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -411,12 +400,12 @@ fn handle_mode_packet<H: HandlePacket>(
         return Err(DecoderError::UnexpectedEOF);
     };
     let byte = *byte;
-    let leaf_id = (byte & 0b11100000) >> 5;
-    let mode = byte & 0b00011111;
+    let leaf_id = (byte & 0b1110_0000) >> 5;
+    let mode = byte & 0b0001_1111;
 
     if leaf_id == 0b000 {
         // MODE.exec packet
-        match mode & 0b00000011 {
+        match mode & 0b0000_0011 {
             0b00 => context.tracee_mode = TraceeMode::Mode16,
             0b01 => context.tracee_mode = TraceeMode::Mode64,
             0b10 => context.tracee_mode = TraceeMode::Mode32,
@@ -433,7 +422,6 @@ fn handle_mode_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_wrong_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -443,7 +431,6 @@ fn handle_wrong_packet<H: HandlePacket>(
     Err(DecoderError::InvalidPacket)
 }
 
-#[inline(always)]
 fn handle_level2_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,

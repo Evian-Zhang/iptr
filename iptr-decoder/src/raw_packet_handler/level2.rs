@@ -7,7 +7,6 @@ use crate::{
     error::{DecoderError, DecoderResult},
 };
 
-#[inline(always)]
 fn handle_cbr_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -28,7 +27,6 @@ fn handle_cbr_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_pip_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -44,7 +42,7 @@ fn handle_pip_packet<H: HandlePacket>(
         return Err(DecoderError::UnexpectedEOF);
     };
     let rsvd_nr = (*byte2 % 2) != 0;
-    let byte2 = *byte2 & 0b11111110; // Clear lowest bit
+    let byte2 = *byte2 & 0b1111_1110; // Clear lowest bit
     let cr3 = u64::from_le_bytes([byte2, *byte3, *byte4, *byte5, *byte6, *byte7, 0, 0]) << 5;
 
     packet_handler
@@ -56,15 +54,15 @@ fn handle_pip_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
+#[expect(clippy::unreadable_literal)]
+const PSB: u128 = 0x82028202820282028202820282028202;
+
 fn handle_psb_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
     context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
-    const PSB: u128 = 0x82028202820282028202820282028202;
-
     let packet_length = 16;
 
     let Some(bytes) = buf
@@ -87,7 +85,6 @@ fn handle_psb_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_psbend_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -105,7 +102,6 @@ fn handle_psbend_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_trace_stop_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -124,7 +120,6 @@ fn handle_trace_stop_packet<H: HandlePacket>(
 }
 
 #[expect(clippy::int_plus_one)]
-#[inline(always)]
 fn handle_long_tnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -159,7 +154,6 @@ fn handle_long_tnt_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_vmcs_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -185,7 +179,6 @@ fn handle_vmcs_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_ovf_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -203,7 +196,6 @@ fn handle_ovf_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_mnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -230,7 +222,7 @@ fn handle_mnt_packet<H: HandlePacket>(
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    if *byte2 != 0b10001000 {
+    if *byte2 != 0b1000_1000 {
         return Err(DecoderError::UnexpectedEOF);
     }
     let payload = u64::from_le_bytes([
@@ -246,7 +238,6 @@ fn handle_mnt_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_tma_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -281,7 +272,6 @@ pub enum PtwPayload {
     EightBytes(u64),
 }
 
-#[inline(always)]
 fn handle_ptw_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -290,8 +280,8 @@ fn handle_ptw_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length;
 
-    let ip_bit = (byte & 0b10000000) != 0;
-    let payload_bytes = (byte & 0b01100000) >> 5;
+    let ip_bit = (byte & 0b1000_0000) != 0;
+    let payload_bytes = (byte & 0b0110_0000) >> 5;
     debug_assert!(payload_bytes <= 0b11, "Unexpected");
     let payload = match payload_bytes {
         0b00 => {
@@ -338,7 +328,6 @@ fn handle_ptw_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_exstop_packet<H: HandlePacket>(
     _buf: &[u8],
     byte: u8,
@@ -347,7 +336,7 @@ fn handle_exstop_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 2;
 
-    let ip_bit = (byte & 0b10000000) != 0;
+    let ip_bit = (byte & 0b1000_0000) != 0;
 
     packet_handler
         .on_exstop_packet(context, ip_bit)
@@ -358,7 +347,6 @@ fn handle_exstop_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_mwait_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -373,7 +361,7 @@ fn handle_mwait_packet<H: HandlePacket>(
     let Some(ext) = buf.get(context.pos + 2) else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let ext = *ext & 0b00000011;
+    let ext = *ext & 0b0000_0011;
 
     packet_handler
         .on_mwait_packet(context, *mwait_hints, ext)
@@ -384,7 +372,6 @@ fn handle_mwait_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_pwre_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -396,9 +383,9 @@ fn handle_pwre_packet<H: HandlePacket>(
     let Some([byte2, byte3]) = buf.get((context.pos + 2)..(context.pos + 4)) else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let hw = (*byte2 & 0b10000000) != 0;
-    let resolved_thread_c_state = (*byte3 & 0b11110000) >> 4;
-    let resolved_thread_sub_c_state = *byte3 & 0b00001111;
+    let hw = (*byte2 & 0b1000_0000) != 0;
+    let resolved_thread_c_state = (*byte3 & 0b1111_0000) >> 4;
+    let resolved_thread_sub_c_state = *byte3 & 0b0000_1111;
 
     packet_handler
         .on_pwre_packet(
@@ -414,7 +401,6 @@ fn handle_pwre_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_pwrx_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -426,9 +412,9 @@ fn handle_pwrx_packet<H: HandlePacket>(
     let Some([byte2, byte3]) = buf.get((context.pos + 2)..(context.pos + 4)) else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let last_core_c_state = (*byte2 & 0b11110000) >> 4;
-    let deepest_core_c_state = *byte2 & 0b00001111;
-    let wake_reason = *byte3 & 0b00001111;
+    let last_core_c_state = (*byte2 & 0b1111_0000) >> 4;
+    let deepest_core_c_state = *byte2 & 0b0000_1111;
+    let wake_reason = *byte3 & 0b0000_1111;
 
     packet_handler
         .on_pwrx_packet(
@@ -444,7 +430,6 @@ fn handle_pwrx_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_bbp_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -454,7 +439,6 @@ fn handle_bbp_packet<H: HandlePacket>(
     Err(DecoderError::Unimplemented)
 }
 
-#[inline(always)]
 fn handle_bep_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -464,7 +448,6 @@ fn handle_bep_packet<H: HandlePacket>(
     Err(DecoderError::Unimplemented)
 }
 
-#[inline(always)]
 fn handle_cfe_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -473,8 +456,8 @@ fn handle_cfe_packet<H: HandlePacket>(
 ) -> DecoderResult<(), H> {
     let packet_length = 2;
 
-    let ip_bit = (byte & 0b10000000) != 0;
-    let r#type = byte & 0b00011111;
+    let ip_bit = (byte & 0b1000_0000) != 0;
+    let r#type = byte & 0b0001_1111;
     let Some(vector) = buf.get(context.pos + 3) else {
         return Err(DecoderError::UnexpectedEOF);
     };
@@ -488,7 +471,6 @@ fn handle_cfe_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[inline(always)]
 fn handle_evd_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -513,7 +495,7 @@ fn handle_evd_packet<H: HandlePacket>(
     else {
         return Err(DecoderError::UnexpectedEOF);
     };
-    let r#type = byte2 & 0b0011111;
+    let r#type = byte2 & 0b001_1111;
     let payload = u64::from_le_bytes([
         *byte3, *byte4, *byte5, *byte6, *byte7, *byte8, *byte9, *byte10,
     ]);
@@ -539,65 +521,65 @@ pub fn decode<H: HandlePacket>(
     let byte = *byte;
 
     match byte {
-        0b00000011 => {
+        0b0000_0011 => {
             handle_cbr_packet(buf, byte, context, packet_handler)?;
         }
-        0b00010010 | 0b00110010 | 0b01010010 | 0b01110010 | 0b10010010 | 0b10110010
-        | 0b11010010 | 0b11110010 => {
+        0b0001_0010 | 0b0011_0010 | 0b0101_0010 | 0b0111_0010 | 0b1001_0010 | 0b1011_0010
+        | 0b1101_0010 | 0b1111_0010 => {
             // xxx10010
             handle_ptw_packet(buf, byte, context, packet_handler)?;
         }
-        0b00010011 => {
+        0b0001_0011 => {
             handle_cfe_packet(buf, byte, context, packet_handler)?;
         }
-        0b00100010 => {
+        0b0010_0010 => {
             handle_pwre_packet(buf, byte, context, packet_handler)?;
         }
-        0b00100011 => {
+        0b0010_0011 => {
             handle_psbend_packet(buf, byte, context, packet_handler)?;
         }
-        0b00110011 | 0b10110011 => {
+        0b0011_0011 | 0b1011_0011 => {
             // x0110011
             handle_bep_packet(buf, byte, context, packet_handler)?;
         }
-        0b01000011 => {
+        0b0100_0011 => {
             handle_pip_packet(buf, byte, context, packet_handler)?;
         }
-        0b01010011 => {
+        0b0101_0011 => {
             handle_evd_packet(buf, byte, context, packet_handler)?;
         }
-        0b01100010 | 0b11100010 => {
+        0b0110_0010 | 0b1110_0010 => {
             // x1100010
             handle_exstop_packet(buf, byte, context, packet_handler)?;
         }
-        0b01100011 => {
+        0b0110_0011 => {
             handle_bbp_packet(buf, byte, context, packet_handler)?;
         }
-        0b01110011 => {
+        0b0111_0011 => {
             handle_tma_packet(buf, byte, context, packet_handler)?;
         }
-        0b10000010 => {
+        0b1000_0010 => {
             handle_psb_packet(buf, byte, context, packet_handler)?;
         }
-        0b10000011 => {
+        0b1000_0011 => {
             handle_trace_stop_packet(buf, byte, context, packet_handler)?;
         }
-        0b10100010 => {
+        0b1010_0010 => {
             handle_pwrx_packet(buf, byte, context, packet_handler)?;
         }
-        0b10100011 => {
+        0b1010_0011 => {
             handle_long_tnt_packet(buf, byte, context, packet_handler)?;
         }
-        0b11000010 => {
+        0b1100_0010 => {
             handle_mwait_packet(buf, byte, context, packet_handler)?;
         }
-        0b11001000 => {
+        0b1100_1000 => {
             handle_vmcs_packet(buf, byte, context, packet_handler)?;
         }
-        0b11110011 => {
+        0b1111_0011 => {
             handle_ovf_packet(buf, byte, context, packet_handler)?;
         }
-        0b11000011 => {
+        0b1100_0011 => {
             handle_mnt_packet(buf, byte, context, packet_handler)?;
         }
         _ => {

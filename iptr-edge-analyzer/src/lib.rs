@@ -35,6 +35,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         }
     }
 
+    #[expect(clippy::cast_sign_loss, clippy::cast_possible_wrap)]
     fn reconstruct_ip_and_update_last(
         &mut self,
         ip_reconstruction: IpReconstructionPattern,
@@ -45,10 +46,16 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 // `last_ip` is not updated
                 return None;
             }
-            TwoBytesWithLastIp(payload) => (self.last_ip & 0xFFFFFFFFFFFF0000) | (payload as u64),
-            FourBytesWithLastIp(payload) => (self.last_ip & 0xFFFFFFFF00000000) | (payload as u64),
+            TwoBytesWithLastIp(payload) => {
+                (self.last_ip & 0xFFFF_FFFF_FFFF_0000) | (payload as u64)
+            }
+            FourBytesWithLastIp(payload) => {
+                (self.last_ip & 0xFFFF_FFFF_0000_0000) | (payload as u64)
+            }
             SixBytesExtended(payload) => (((payload << 16) as i64) >> 16) as u64,
-            SixBytesWithLastIp(payload) => (self.last_ip & 0xFFFF000000000000) | (payload as u64),
+            SixBytesWithLastIp(payload) => {
+                (self.last_ip & 0xFFFF_0000_0000_0000) | (payload as u64)
+            }
             EightBytes(payload) => payload,
         };
         self.last_ip = ip;
@@ -57,7 +64,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
     }
 }
 
-impl<'a, H, R> HandlePacket for EdgeAnalyzer<'a, H, R>
+impl<H, R> HandlePacket for EdgeAnalyzer<'_, H, R>
 where
     H: HandleControlFlow,
     AnalyzerError<H, R>: std::error::Error,

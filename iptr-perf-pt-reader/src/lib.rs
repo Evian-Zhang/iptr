@@ -10,6 +10,7 @@ use crate::error::{ReaderError, ReaderResult};
 
 const PERF_RECORD_AUXTRACE: u32 = 71;
 
+#[expect(clippy::cast_possible_truncation)]
 pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxtrace<'_>>> {
     let mut pt_auxtraces = Vec::new();
 
@@ -108,6 +109,7 @@ pub struct PerfRecordAuxtrace<'a> {
     pub auxtrace_data: &'a [u8],
 }
 
+#[expect(clippy::cast_possible_truncation)]
 fn read_auxtrace<'a>(perf_data: &'a [u8], pos: &mut usize) -> Option<PerfRecordAuxtrace<'a>> {
     let size = util::read_u64(perf_data, *pos)?;
     *pos += 8;
