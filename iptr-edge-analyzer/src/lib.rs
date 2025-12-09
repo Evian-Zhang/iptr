@@ -2,13 +2,10 @@ mod control_flow_analyzer;
 mod control_flow_handler;
 pub mod error;
 mod memory_reader;
-mod tnt_buffer;
 
 use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
-use crate::{
-    control_flow_analyzer::ControlFlowAnalyzer, error::AnalyzerError, tnt_buffer::TntBuffer,
-};
+use crate::{control_flow_analyzer::ControlFlowAnalyzer, error::AnalyzerError};
 pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemory};
 
 pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
@@ -18,7 +15,6 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     /// special semantic according to Intel. Do not use thie field
     /// until you know what you are doing.
     last_ip: u64,
-    tnt_buffer: TntBuffer,
     control_flow_analyzer: ControlFlowAnalyzer,
     handler: &'a mut H,
     reader: &'a mut R,
@@ -28,7 +24,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
     pub fn new(handler: &'a mut H, reader: &'a mut R) -> Self {
         Self {
             last_ip: 0,
-            tnt_buffer: TntBuffer::new(),
             control_flow_analyzer: ControlFlowAnalyzer::new(),
             handler,
             reader,
