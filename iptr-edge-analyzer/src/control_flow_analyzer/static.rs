@@ -124,7 +124,7 @@ impl StaticControlFlowAnalyzer {
 
                             Ok((cfg_terminator, next_insn_addr))
                         })
-                        .map_err(|err| AnalyzerError::MemoryReader(err))??;
+                        .map_err(AnalyzerError::MemoryReader)??;
 
                     if let Some(cfg_terminator) = cfg_terminator {
                         break cfg_terminator;

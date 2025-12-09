@@ -77,7 +77,7 @@ fn handle_pad_packet<H: HandlePacket>(
     loop {
         packet_handler
             .on_pad_packet(context)
-            .map_err(|err| DecoderError::PacketHandler(err))?;
+            .map_err(DecoderError::PacketHandler)?;
 
         context.pos += packet_length;
         let Some(byte) = buf.get(context.pos) else {
@@ -108,7 +108,7 @@ fn handle_short_tnt_packet<H: HandlePacket>(
     let highest_bit = 6 - byte.leading_zeros();
     packet_handler
         .on_short_tnt_packet(context, byte, highest_bit)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     context.pos += packet_length;
 
@@ -129,7 +129,7 @@ fn handle_tip_packet<H: HandlePacket>(
 
     packet_handler
         .on_tip_packet(context, ip_reconstruction_pattern)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     Ok(())
 }
@@ -148,7 +148,7 @@ fn handle_tip_pgd_packet<H: HandlePacket>(
 
     packet_handler
         .on_tip_pgd_packet(context, ip_reconstruction_pattern)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     Ok(())
 }
@@ -167,7 +167,7 @@ fn handle_tip_pge_packet<H: HandlePacket>(
 
     packet_handler
         .on_tip_pge_packet(context, ip_reconstruction_pattern)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     Ok(())
 }
@@ -186,7 +186,7 @@ fn handle_fup_packet<H: HandlePacket>(
 
     packet_handler
         .on_fup_packet(context, ip_reconstruction_pattern)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     Ok(())
 }
@@ -333,7 +333,7 @@ fn handle_cyc_packet<H: HandlePacket>(
     debug_assert!(buf.len() > end_pos, "Unexpected");
     packet_handler
         .on_cyc_packet(context, unsafe { buf.get_unchecked(context.pos..end_pos) })
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     context.pos = end_pos;
 
@@ -359,7 +359,7 @@ fn handle_tsc_packet<H: HandlePacket>(
 
     packet_handler
         .on_tsc_packet(context, tsc_value)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     context.pos += packet_length;
 
@@ -381,7 +381,7 @@ fn handle_mtc_packet<H: HandlePacket>(
 
     packet_handler
         .on_mtc_packet(context, ctc_payload)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     context.pos += packet_length;
 
@@ -415,7 +415,7 @@ fn handle_mode_packet<H: HandlePacket>(
 
     packet_handler
         .on_mode_packet(context, leaf_id, mode)
-        .map_err(|err| DecoderError::PacketHandler(err))?;
+        .map_err(DecoderError::PacketHandler)?;
 
     context.pos += packet_length;
 

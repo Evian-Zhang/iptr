@@ -52,14 +52,14 @@ impl ControlFlowAnalyzer {
                     last_bb = if is_taken { r#true } else { r#false };
                     handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
-                        .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
                     break 'cfg_traverse;
                 }
                 DirectGoto { target } => {
                     last_bb = target;
                     handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
-                        .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
                 DirectCall {
@@ -69,12 +69,12 @@ impl ControlFlowAnalyzer {
                     last_bb = target;
                     handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
-                        .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
                     self.callstack.push(return_address);
                     continue 'cfg_traverse;
                 }
                 IndirectGotoOrCall => {
-                    // Wait for TIP
+                    // Wait for deferred TIP
                     break 'cfg_traverse;
                 }
                 NearRet => {
@@ -89,7 +89,7 @@ impl ControlFlowAnalyzer {
                     };
                     handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::Return)
-                        .map_err(|err| AnalyzerError::ControlFlowHandler(err))?;
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
                 }
                 FarTransfers => {
                     // Far transfers will always emit FUP packets immediately
