@@ -15,7 +15,7 @@ pub struct CfgNode {
 pub enum CfgTerminator {
     Branch { r#true: u64, r#false: u64 },
     DirectGoto { target: u64 },
-    DirectCall { target: u64 },
+    DirectCall { target: u64, return_address: u64 },
     IndirectGotoOrCall,
     NearRet,
     FarTransfers,
@@ -40,7 +40,10 @@ impl CfgTerminator {
             Some(CfgTerminator::DirectGoto { target })
         } else if instruction.is_call_near() {
             let target = instruction.near_branch_target();
-            Some(CfgTerminator::DirectCall { target })
+            Some(CfgTerminator::DirectCall {
+                target,
+                return_address: next_insn_addr,
+            })
         } else {
             match instruction.code() {
                 | Code::Retnd | Code::Retnd_imm16

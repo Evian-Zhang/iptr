@@ -15,6 +15,10 @@ pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {
     /// Instructions non-decodable by iced-x86
     #[error("Invalid instruction: {}", .0.iter().map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(" "))]
     InvalidInstruction(Box<[u8]>),
+    /// Corrupted callstack, will affect the behavior
+    /// of return compression
+    #[error("The self-maintained callstack is corrupted")]
+    CorruptedCallstack,
     /// Semantic-level invalid packet
     #[error("Invalid packet")]
     InvalidPacket,
