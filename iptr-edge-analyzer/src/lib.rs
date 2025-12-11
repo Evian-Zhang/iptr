@@ -2,6 +2,7 @@ mod control_flow_handler;
 pub mod error;
 mod memory_reader;
 mod static_analyzer;
+mod tnt_buffer;
 
 use std::num::NonZero;
 
