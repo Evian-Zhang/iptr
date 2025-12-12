@@ -6,27 +6,27 @@ pub struct TntBuffer(u64);
 
 impl TntBuffer {
     /// Take all 64 TNT bits
-    pub fn as_array8(&self) -> [u8; 8] {
+    pub fn to_array_qword(&self) -> [u8; 8] {
         let Self(buf) = self;
         buf.to_le_bytes()
     }
 
     /// Take first 32 TNT bits
-    pub fn as_array4(&self) -> [u8; 4] {
+    pub fn to_array_dword(&self) -> [u8; 4] {
         let Self(buf) = self;
         let [a0, a1, a2, a3, ..] = buf.to_le_bytes();
         [a0, a1, a2, a3]
     }
 
     /// Take first 16 TNT bits
-    pub fn as_array2(&self) -> [u8; 2] {
+    pub fn to_array_word(&self) -> [u8; 2] {
         let Self(buf) = self;
         let [a0, a1, ..] = buf.to_le_bytes();
         [a0, a1]
     }
 
     /// Take first 8 TNT bits
-    pub fn as_array1(&self) -> [u8; 1] {
+    pub fn to_array_byte(&self) -> [u8; 1] {
         let Self(buf) = self;
         let [a0, ..] = buf.to_le_bytes();
         [a0]
