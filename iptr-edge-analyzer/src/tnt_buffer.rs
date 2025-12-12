@@ -37,7 +37,7 @@ impl TntBuffer {
 
 pub struct TntBufferManager {
     buf: TntBuffer,
-    count: usize,
+    count: u32,
 }
 
 impl Default for TntBufferManager {
@@ -49,45 +49,78 @@ impl Default for TntBufferManager {
     }
 }
 
+/// The LSB bit in short TNT packet
+const SHORT_TNT_PREFIX_BIT_COUNT: u32 = 1;
+/// The first two bytes in long TNT packet:
+/// 0b0000_0010, 0b1010_0011
+const LONG_TNT_PREFIX_BIT_COUNT: u32 = 16;
+
 impl TntBufferManager {
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// You must pass a short TNT format packet here
     #[must_use]
     pub fn extend_with_short_tnt(&mut self, short_tnt_packet: u8) -> Option<TntBuffer> {
-        let highest_bit = (6 - short_tnt_packet.leading_zeros()) as usize;
-        if highest_bit == 0 {
+        // u8::BITS - 1: largest index
+        // another "- 1": upmost one indicating the end of TNT BITS
+        let highest_bit = u8::BITS - 1 - 1 - short_tnt_packet.leading_zeros();
+        if highest_bit == SHORT_TNT_PREFIX_BIT_COUNT - 1 {
             // Nothing to extend: 0b0000_0010
             return None;
         }
+        let tnt_count = highest_bit - (SHORT_TNT_PREFIX_BIT_COUNT - 1);
+
         let TntBuffer(buf) = &mut self.buf;
-        if highest_bit + self.count < 64 {
+        if tnt_count + self.count < u64::BITS {
             // Not full
-            *buf |= (((short_tnt_packet & (0xFF >> (7 - highest_bit))) >> 1) as u64) << self.count;
-            self.count += highest_bit; // self.count will never get 64
+            *buf &= u64::MAX.wrapping_shr(64 - self.count); // Clear the part
+            *buf |= ((short_tnt_packet >> SHORT_TNT_PREFIX_BIT_COUNT) as u64) << self.count;
+            self.count += tnt_count; // self.count will never get u64::BITS
             None
         } else {
             // With this packet, get full
-            let this_highest_bit = 64 - self.count;
-            *buf |=
-                (((short_tnt_packet & (0xFF >> (7 - this_highest_bit))) >> 1) as u64) << self.count;
+            let this_tnt_count = u64::BITS - self.count;
+            *buf &= u64::MAX.wrapping_shr(64 - self.count); // Clear the part
+            *buf |= ((short_tnt_packet >> SHORT_TNT_PREFIX_BIT_COUNT) as u64) << self.count;
             let full_buf = TntBuffer(*buf);
-            let remain_count = highest_bit - this_highest_bit;
-            *buf = ((short_tnt_packet >> (this_highest_bit + 1)) & (0xFF >> (8 - (remain_count))))
-                as u64;
+            let remain_count = tnt_count - this_tnt_count;
+            *buf =
+                (short_tnt_packet.wrapping_shr(this_tnt_count + SHORT_TNT_PREFIX_BIT_COUNT)) as u64;
             self.count = remain_count;
             Some(full_buf)
         }
     }
 
-    /// May not be full, need to check [`bit_count`][Self::bit_count]
-    pub fn buffer(&self) -> TntBuffer {
-        self.buf
-    }
-
-    pub fn bit_count(&self) -> usize {
-        self.count
+    /// You must pass a long TNT format packet here
+    #[must_use]
+    pub fn extend_with_long_tnt(&mut self, long_tnt_packet: u64) -> Option<TntBuffer> {
+        // u8::BITS - 1: largest index
+        // another "- 1": upmost one indicating the end of TNT BITS
+        let highest_bit = u64::BITS - 1 - 1 - long_tnt_packet.leading_zeros();
+        if highest_bit == LONG_TNT_PREFIX_BIT_COUNT - 1 {
+            // Nothing to extend
+            return None;
+        }
+        let tnt_count = highest_bit - (LONG_TNT_PREFIX_BIT_COUNT - 1);
+        // 1111 1110 1111 1110 1111 1101 1111 1101 1111 1101 1111 1101 1111 1101 1111 1101
+        let TntBuffer(buf) = &mut self.buf;
+        if tnt_count + self.count < u64::BITS {
+            // Not full
+            *buf |= (long_tnt_packet >> LONG_TNT_PREFIX_BIT_COUNT) << self.count;
+            self.count += tnt_count; // self.count will never get u64::BITS
+            None
+        } else {
+            // With this packet, get full
+            let this_tnt_count = u64::BITS - self.count;
+            *buf |= (long_tnt_packet >> LONG_TNT_PREFIX_BIT_COUNT) << self.count;
+            let full_buf = TntBuffer(*buf);
+            let remain_count = tnt_count - this_tnt_count;
+            *buf = long_tnt_packet.wrapping_shr(this_tnt_count + LONG_TNT_PREFIX_BIT_COUNT);
+            self.count = remain_count;
+            Some(full_buf)
+        }
     }
 }
 
@@ -95,28 +128,54 @@ impl TntBufferManager {
 mod tests {
     use super::*;
 
+    impl TntBufferManager {
+        /// May not be full, need to check [`bit_count`][Self::bit_count]
+        fn buffer(&self) -> TntBuffer {
+            let TntBuffer(buf) = self.buf;
+            let buf = buf & u64::MAX.wrapping_shr(u64::BITS - self.count);
+            TntBuffer(buf)
+        }
+
+        /// Get bit count
+        fn bit_count(&self) -> u32 {
+            self.count
+        }
+    }
+
     #[test]
-    fn test_buffer_extend_from_zero() {
+    fn test_buffer_extend_zero_short_tnt() {
         let mut buffer_manager = TntBufferManager::default();
 
-        let full_buf = buffer_manager.extend_with_short_tnt(0b01101010);
+        // No TNT bits in this packet
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0000_0010);
         assert!(full_buf.is_none());
-        let TntBuffer(buf) = buffer_manager.buf;
+        let TntBuffer(buf) = buffer_manager.buffer();
+        assert_eq!(buf, 0b0);
+        assert_eq!(buffer_manager.bit_count(), 0);
+    }
+
+    #[test]
+    fn test_buffer_extend_short_tnt_from_zero() {
+        let mut buffer_manager = TntBufferManager::default();
+
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
+        assert!(full_buf.is_none());
+        let TntBuffer(buf) = buffer_manager.buffer();
         assert_eq!(buf, 0b10101);
         assert_eq!(buffer_manager.bit_count(), 5);
     }
 
     #[test]
-    fn test_buffer_extend_until_full() {
+    fn test_buffer_extend_short_tnt_until_full() {
         let mut buffer_manager = TntBufferManager::default();
 
         for loop_count in 0..12 {
             // Each time will add 5 bits, after 13 times, will reach full
-            let full_buf = buffer_manager.extend_with_short_tnt(0b01101010);
+            let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
             assert!(full_buf.is_none());
             assert_eq!(buffer_manager.bit_count(), 5 * (loop_count + 1));
         }
-        let full_buf = buffer_manager.extend_with_short_tnt(0b01101010);
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
         assert!(full_buf.is_some());
         if let Some(TntBuffer(full_buf)) = full_buf {
             assert_eq!(
@@ -124,8 +183,89 @@ mod tests {
                 0b0101_10101_10101_10101_10101_10101_10101_10101_10101_10101_10101_10101_10101
             );
         }
-        let TntBuffer(buf) = buffer_manager.buf;
+        let TntBuffer(buf) = buffer_manager.buffer();
         assert_eq!(buf, 0b1);
         assert_eq!(buffer_manager.bit_count(), 1);
+    }
+
+    #[test]
+    fn test_buffer_extend_zero_long_tnt() {
+        let mut buffer_manager = TntBufferManager::default();
+
+        // No TNT bits in this packet
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b0000_0010,
+            0b1010_0011,
+            0x1,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]));
+        assert!(full_buf.is_none());
+        let TntBuffer(buf) = buffer_manager.buffer();
+        assert_eq!(buf, 0b0);
+        assert_eq!(buffer_manager.bit_count(), 0);
+    }
+
+    #[test]
+    fn test_buffer_extend_long_tnt_from_zero() {
+        let mut buffer_manager = TntBufferManager::default();
+
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b0000_0010,
+            0b1010_0011,
+            0b1111_1101,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]));
+        assert!(full_buf.is_none());
+        let TntBuffer(buf) = buffer_manager.buffer();
+        assert_eq!(buf, 0b0111_1101);
+        assert_eq!(buffer_manager.bit_count(), 7);
+    }
+
+    #[test]
+    fn test_buffer_extend_long_tnt_until_full() {
+        let mut buffer_manager = TntBufferManager::default();
+
+        // This will add 47 TNT bits
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b0000_0010,
+            0b1010_0011,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+        ]));
+        assert!(full_buf.is_none());
+        assert_eq!(buffer_manager.bit_count(), 47);
+        // This will add another 47 TNT bits, remain 30 bits
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b0000_0010,
+            0b1010_0011,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+        ]));
+        assert!(full_buf.is_some());
+        if let Some(TntBuffer(full_buf)) = full_buf {
+            assert_eq!(
+                full_buf,
+                0b1_1111_1101_1111_1101_111_1101_1111_1101_1111_1101_1111_1101_1111_1101_1111_1101
+            );
+        }
+        let TntBuffer(buf) = buffer_manager.buffer();
+        assert_eq!(buf, 0b111_1101_1111_1101_1111_1101_1111_110);
+        assert_eq!(buffer_manager.bit_count(), 30);
     }
 }
