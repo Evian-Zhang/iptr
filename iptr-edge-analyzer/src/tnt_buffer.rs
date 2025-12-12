@@ -1,5 +1,3 @@
-use std::num::NonZero;
-
 /// A full TNT bits buffer
 ///
 /// This will only be retrieved from a [`TntBufferManager`]
@@ -62,6 +60,10 @@ impl TntBufferManager {
     /// You must pass a short TNT format packet here
     #[must_use]
     pub fn extend_with_short_tnt(&mut self, short_tnt_packet: u8) -> Option<TntBuffer> {
+        debug_assert!(
+            short_tnt_packet.leading_zeros() <= 6,
+            "There should be at least one leading one bit"
+        );
         // u8::BITS - 1: largest index
         // another "- 1": upmost one indicating the end of TNT BITS
         let highest_bit = u8::BITS - 1 - 1 - short_tnt_packet.leading_zeros();
@@ -98,6 +100,17 @@ impl TntBufferManager {
     /// As a result, the upmost two bytes are cleared.
     #[must_use]
     pub fn extend_with_long_tnt(&mut self, long_tnt_packet: u64) -> Option<TntBuffer> {
+        debug_assert_eq!(
+            long_tnt_packet >> 48,
+            0,
+            "Upmost two bytes are not cleared!"
+        );
+        debug_assert_ne!(
+            long_tnt_packet.leading_zeros(),
+            u64::BITS,
+            "There should be at least one leading one bit"
+        );
+
         // u64::BITS - 1: largest index
         // another "- 1": upmost one indicating the end of TNT BITS
         let highest_bit = (u64::BITS - 1 - 1).wrapping_sub(long_tnt_packet.leading_zeros());
