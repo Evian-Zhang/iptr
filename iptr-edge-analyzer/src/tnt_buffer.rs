@@ -104,7 +104,7 @@ impl TntBufferManager {
             return None;
         }
         let tnt_count = highest_bit - (LONG_TNT_PREFIX_BIT_COUNT - 1);
-        // 1111 1110 1111 1110 1111 1101 1111 1101 1111 1101 1111 1101 1111 1101 1111 1101
+
         let TntBuffer(buf) = &mut self.buf;
         if tnt_count + self.count < u64::BITS {
             // Not full
