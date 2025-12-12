@@ -1,3 +1,5 @@
+//! This module contains definition of errors made when decoding
+
 use core as std; // workaround for `perfect_derive`
 
 use perfect_derive::perfect_derive;
@@ -5,6 +7,7 @@ use thiserror::Error;
 
 use crate::HandlePacket;
 
+/// Error for the decoding
 #[derive(Error)]
 #[perfect_derive(Debug)]
 pub enum DecoderError<H: HandlePacket> {

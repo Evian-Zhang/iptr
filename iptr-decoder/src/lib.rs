@@ -1,6 +1,7 @@
 #![no_std]
 
 pub mod error;
+pub mod packet_handler;
 mod raw_packet_handler;
 
 pub use raw_packet_handler::{level1::IpReconstructionPattern, level2::PtwPayload};
@@ -159,7 +160,7 @@ pub trait HandlePacket {
 
     /// Handle TMA packet
     ///
-    /// `ctc` is CTC[15:0], `fast_counter` is FastCounter[7:0], `fc8` is FC[8]
+    /// `ctc` is `CTC[15:0]`, `fast_counter` is `FastCounter[7:0]`, `fc8` is `FC[8]`
     #[allow(unused)]
     fn on_tma_packet(
         &mut self,
@@ -173,7 +174,7 @@ pub trait HandlePacket {
 
     /// Handle VMCS packet
     ///
-    /// `vmcs_pointer`'s 12..=51 bits are VMCS pointer [51:12] (other bits guaranteed cleared)
+    /// `vmcs_pointer`'s 12..=51 bits are `VMCS pointer [51:12]` (other bits guaranteed cleared)
     #[allow(unused)]
     fn on_vmcs_packet(
         &mut self,
@@ -209,7 +210,7 @@ pub trait HandlePacket {
 
     /// Handle PIP packet
     ///
-    /// `cr3`'s 5..=51 bits are CR3[51:5] (other bits guaranteed cleared),
+    /// `cr3`'s 5..=51 bits are `CR3[51:5]` (other bits guaranteed cleared),
     /// `rsvd_nr` is RSVD/NR
     #[allow(unused)]
     fn on_pip_packet(
@@ -223,7 +224,7 @@ pub trait HandlePacket {
 
     /// Handle MNT packet
     ///
-    /// `payload` is Payload[63:0]
+    /// `payload` is `Payload[63:0]`
     #[allow(unused)]
     fn on_mnt_packet(&mut self, context: &DecoderContext, payload: u64) -> Result<(), Self::Error> {
         Ok(())
@@ -256,7 +257,7 @@ pub trait HandlePacket {
 
     /// Handle MWAIT packet
     ///
-    /// `mwait_hints` is MWAIT Hints[7:0], `ext` is EXT[1:0] (upper 6 bits guaranteed cleared)
+    /// `mwait_hints` is `MWAIT Hints[7:0]`, `ext` is `EXT[1:0]` (upper 6 bits guaranteed cleared)
     #[allow(unused)]
     fn on_mwait_packet(
         &mut self,
@@ -300,7 +301,7 @@ pub trait HandlePacket {
 
     /// Handle EVD packet
     ///
-    /// `r#type` is Type[5:0] (upper 2 bits guaranteed cleared), `payload` is Payload[63:0]
+    /// `r#type` is `Type[5:0]` (upper 2 bits guaranteed cleared), `payload` is `Payload[63:0]`
     #[allow(unused)]
     fn on_evd_packet(
         &mut self,
@@ -313,8 +314,8 @@ pub trait HandlePacket {
 
     /// Handle CFE packet
     ///
-    /// `ip_bit` is the IP bit, `r#type` is Type[4:0] (upper 3 bits guaranteed cleared),
-    /// `vector` is the Vector[7:0]
+    /// `ip_bit` is the IP bit, `r#type` is `Type[4:0]` (upper 3 bits guaranteed cleared),
+    /// `vector` is the `Vector[7:0]`
     #[allow(unused)]
     fn on_cfe_packet(
         &mut self,

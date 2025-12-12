@@ -119,7 +119,6 @@ fn handle_trace_stop_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[expect(clippy::int_plus_one)]
 fn handle_long_tnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -264,10 +263,13 @@ fn handle_tma_packet<H: HandlePacket>(
     Ok(())
 }
 
-#[derive(Debug, Display)]
+/// Payload for PTW packet
+#[derive(Debug, Display, Clone, Copy)]
 pub enum PtwPayload {
+    /// Four bytes payload
     #[display("FourBytes({_0:#x})")]
     FourBytes(u32),
+    /// Eight bytes payload
     #[display("EightBytes({_0:#x})")]
     EightBytes(u64),
 }

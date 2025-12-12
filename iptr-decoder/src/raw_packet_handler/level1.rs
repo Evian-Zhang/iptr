@@ -196,19 +196,19 @@ fn handle_fup_packet<H: HandlePacket>(
 pub enum IpReconstructionPattern {
     /// None, IP is out of context
     OutOfContext,
-    /// IP Payload[15:0]
+    /// `IP Payload[15:0]`
     #[display("TwoBytesWithLastIp({_0:#x})")]
     TwoBytesWithLastIp(u16),
-    /// IP Payload[31:0]
+    /// `IP Payload[31:0]`
     #[display("FourBytesWithLastIp({_0:#x})")]
     FourBytesWithLastIp(u32),
-    /// IP Payload[47:0], the upper 2 bytes are guaranteed to be cleared
+    /// `IP Payload[47:0]`, the upper 2 bytes are guaranteed to be cleared
     #[display("SixBytesExtended({_0:#x})")]
     SixBytesExtended(u64),
-    /// IP Payload[47:0], the upper 2 bytes are guaranteed to be cleared
+    /// `IP Payload[47:0]`, the upper 2 bytes are guaranteed to be cleared
     #[display("SixBytesWithLastIp({_0:#x})")]
     SixBytesWithLastIp(u64),
-    /// IP Payload[63:0]
+    /// `IP Payload[63:0]`
     #[display("EightBytes({_0:#x})")]
     EightBytes(u64),
 }
