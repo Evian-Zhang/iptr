@@ -22,6 +22,10 @@ pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {
     /// Semantic-level invalid packet
     #[error("Invalid packet")]
     InvalidPacket,
+    /// Return compression is not supported since we need to maintain
+    /// the callstack in the cache, which is very hard to design a efficient way
+    #[error("Return compression is not supported")]
+    UnsupportedReturnCompression,
     /// Unexpected edge analyzer error
     #[error("Unexpected edge analyzer error")]
     Unexpected,

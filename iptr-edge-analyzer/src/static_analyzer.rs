@@ -13,9 +13,19 @@ pub struct CfgNode {
 
 #[derive(Clone, Copy)]
 pub enum CfgTerminator {
-    Branch { r#true: u64, r#false: u64 },
-    DirectGoto { target: u64 },
-    DirectCall { target: u64, return_address: u64 },
+    Branch {
+        r#true: u64,
+        r#false: u64,
+    },
+    DirectGoto {
+        target: u64,
+    },
+    DirectCall {
+        target: u64,
+        /// Used for return compression, but currently this is not supported
+        #[expect(unused)]
+        return_address: u64,
+    },
     IndirectGotoOrCall,
     NearRet,
     FarTransfers,

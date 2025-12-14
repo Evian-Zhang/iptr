@@ -1,6 +1,6 @@
-use std::num::NonZero;
+use hashbrown::HashMap;
 
-use hashbrown::{DefaultHashBuilder, HashMap, hash_map::Entry};
+use crate::TntProceed;
 
 #[derive(Hash, PartialEq, Eq)]
 enum CachedTnts {
@@ -17,7 +17,8 @@ pub struct ControlFlowSequence {
 
 pub struct CachableInformation<D> {
     pub user_data: D,
-    pub new_bb: NonZero<u64>,
+    pub new_bb: u64,
+    pub tnt_proceed: TntProceed,
 }
 
 pub struct ControlFlowCacheManager<D> {
@@ -31,9 +32,6 @@ impl<D> Default for ControlFlowCacheManager<D> {
         }
     }
 }
-
-type ControlFlowCacheEntry<'a, D> =
-    Entry<'a, ControlFlowSequence, CachableInformation<D>, DefaultHashBuilder>;
 
 impl<D> ControlFlowCacheManager<D> {
     pub fn new() -> Self {
@@ -57,13 +55,6 @@ impl<D> ControlFlowCacheManager<D> {
         );
     }
 
-    pub fn entry_of_byte(&mut self, start_bb: u64, byte: u8) -> ControlFlowCacheEntry<'_, D> {
-        self.cache.entry(ControlFlowSequence {
-            start_bb,
-            cached_tnts: CachedTnts::Byte([byte]),
-        })
-    }
-
     pub fn get_dword(&self, start_bb: u64, dword: [u8; 4]) -> Option<&CachableInformation<D>> {
         self.cache.get(&ControlFlowSequence {
             start_bb,
@@ -79,16 +70,5 @@ impl<D> ControlFlowCacheManager<D> {
             },
             info,
         );
-    }
-
-    pub fn entry_of_dword(
-        &mut self,
-        start_bb: u64,
-        dword: [u8; 4],
-    ) -> ControlFlowCacheEntry<'_, D> {
-        self.cache.entry(ControlFlowSequence {
-            start_bb,
-            cached_tnts: CachedTnts::Dword(dword),
-        })
     }
 }
