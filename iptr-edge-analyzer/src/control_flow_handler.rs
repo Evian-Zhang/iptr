@@ -9,6 +9,7 @@ pub enum ControlFlowTransitionKind {
 
 pub trait HandleControlFlow {
     type Error: std::error::Error;
+    type CachedKey;
 
     fn on_new_block(
         &mut self,

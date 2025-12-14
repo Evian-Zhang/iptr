@@ -10,10 +10,11 @@ use std::num::NonZero;
 use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 use crate::{
+    control_flow_cache::ControlFlowCacheManager,
     control_flow_handler::ControlFlowTransitionKind,
     error::{AnalyzerError, AnalyzerResult},
     static_analyzer::StaticControlFlowAnalyzer,
-    tnt_buffer::TntBufferManager,
+    tnt_buffer::{TntBuffer, TntBufferManager},
 };
 pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemory};
 
@@ -30,6 +31,7 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     last_bb: Option<NonZero<u64>>,
     callstack: Vec<u64>,
     tnt_buffer_manager: TntBufferManager,
+    cache_manager: ControlFlowCacheManager<H::CachedKey>,
     static_analyzer: StaticControlFlowAnalyzer,
     handler: &'a mut H,
     reader: &'a mut R,
@@ -42,6 +44,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             last_bb: None,
             callstack: vec![],
             tnt_buffer_manager: TntBufferManager::new(),
+            cache_manager: ControlFlowCacheManager::new(),
             static_analyzer: StaticControlFlowAnalyzer::new(),
             handler,
             reader,
@@ -74,6 +77,14 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         self.last_ip = ip;
 
         Some(ip)
+    }
+
+    fn handle_tnt_buffer(
+        &mut self,
+        tnt_buffer: TntBuffer,
+        tnt_count: usize,
+    ) -> AnalyzerResult<(), H, R> {
+        Ok(())
     }
 
     fn handle_tnt_bit(
