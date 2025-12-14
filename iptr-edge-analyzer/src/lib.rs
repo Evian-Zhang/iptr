@@ -93,17 +93,35 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
     ) -> AnalyzerResult<(), H, R> {
         if let Some(cached_info) = self.cache_manager.get_dword(self.last_bb(), tnt_buffer) {
             self.last_bb = Some(cached_info.new_bb);
-            self.handler
-                .on_reused_cache(&cached_info.user_data)
-                .map_err(AnalyzerError::ControlFlowHandler)?;
+            if let Some(cached_key) = cached_info.user_data {
+                self.handler
+                    .on_reused_cache(cached_key)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
 
             return Ok(());
         }
+        let start_bb = self.last_bb();
+        let mut cached_key = None;
         let [b0, b1, b2, b3] = tnt_buffer;
-        let key0 = self.handle_tnt_buffer8(context, b0)?;
-        self.handle_tnt_buffer8(context, b1)?;
-        self.handle_tnt_buffer8(context, b2)?;
-        self.handle_tnt_buffer8(context, b3)?;
+        let new_cached_key = self.handle_tnt_buffer8(context, b0)?;
+        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+        let new_cached_key = self.handle_tnt_buffer8(context, b1)?;
+        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+        let new_cached_key = self.handle_tnt_buffer8(context, b2)?;
+        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+        let new_cached_key = self.handle_tnt_buffer8(context, b3)?;
+        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+        if let Some(new_bb) = self.last_bb {
+            self.cache_manager.insert_dword(
+                start_bb,
+                tnt_buffer,
+                CachableInformation {
+                    user_data: cached_key,
+                    new_bb,
+                },
+            );
+        }
 
         Ok(())
     }
@@ -116,9 +134,9 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         if let Some(cached_info) = self.cache_manager.get_byte(self.last_bb(), tnt_bits) {
             self.last_bb = Some(cached_info.new_bb);
             if let Some(cached_key) = &cached_info.user_data {
-            self.handler
-                .on_reused_cache(*cached_key)
-                .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.handler
+                    .on_reused_cache(*cached_key)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
             }
 
             return Ok(cached_info.user_data);
@@ -128,13 +146,9 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         for bit in 0..8 {
             let tnt_bit = (tnt_bits & (1 << bit)) != 0;
             let new_cached_key = self.process_tnt_bit_without_cache(context, tnt_bit)?;
-            if let Some(new_cached_key) = new_cached_key {
-                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-            }
+            update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
         }
-        if let Some(new_bb) = self.last_bb
-            && let Some(cached_key) = cached_key
-        {
+        if let Some(new_bb) = self.last_bb {
             self.cache_manager.insert_byte(
                 start_bb,
                 tnt_bits,
@@ -144,7 +158,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 },
             );
         }
-        Ok(())
+        Ok(cached_key)
     }
 
     fn process_tnt_bit_without_cache(
