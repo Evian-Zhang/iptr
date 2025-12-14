@@ -10,7 +10,7 @@ use std::num::NonZero;
 use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 use crate::{
-    control_flow_cache::ControlFlowCacheManager,
+    control_flow_cache::{CachableInformation, ControlFlowCacheManager},
     control_flow_handler::ControlFlowTransitionKind,
     error::{AnalyzerError, AnalyzerResult},
     static_analyzer::StaticControlFlowAnalyzer,
@@ -31,7 +31,7 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     last_bb: Option<NonZero<u64>>,
     callstack: Vec<u64>,
     tnt_buffer_manager: TntBufferManager,
-    cache_manager: ControlFlowCacheManager<H::CachedKey>,
+    cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
     static_analyzer: StaticControlFlowAnalyzer,
     handler: &'a mut H,
     reader: &'a mut R,
@@ -79,23 +79,84 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Some(ip)
     }
 
-    fn handle_tnt_buffer(
+    fn last_bb(&self) -> u64 {
+        let Some(last_bb) = self.last_bb else {
+            return 0;
+        };
+        last_bb.get()
+    }
+
+    fn handle_tnt_buffer32(
         &mut self,
-        tnt_buffer: TntBuffer,
-        tnt_count: usize,
+        context: &DecoderContext,
+        tnt_buffer: [u8; 4],
     ) -> AnalyzerResult<(), H, R> {
+        if let Some(cached_info) = self.cache_manager.get_dword(self.last_bb(), tnt_buffer) {
+            self.last_bb = Some(cached_info.new_bb);
+            self.handler
+                .on_reused_cache(&cached_info.user_data)
+                .map_err(AnalyzerError::ControlFlowHandler)?;
+
+            return Ok(());
+        }
+        let [b0, b1, b2, b3] = tnt_buffer;
+        let key0 = self.handle_tnt_buffer8(context, b0)?;
+        self.handle_tnt_buffer8(context, b1)?;
+        self.handle_tnt_buffer8(context, b2)?;
+        self.handle_tnt_buffer8(context, b3)?;
+
         Ok(())
     }
 
-    fn handle_tnt_bit(
+    fn handle_tnt_buffer8(
+        &mut self,
+        context: &DecoderContext,
+        tnt_bits: u8,
+    ) -> AnalyzerResult<Option<H::CachedKey>, H, R> {
+        if let Some(cached_info) = self.cache_manager.get_byte(self.last_bb(), tnt_bits) {
+            self.last_bb = Some(cached_info.new_bb);
+            if let Some(cached_key) = &cached_info.user_data {
+            self.handler
+                .on_reused_cache(*cached_key)
+                .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
+
+            return Ok(cached_info.user_data);
+        }
+        let mut cached_key = None;
+        let start_bb = self.last_bb();
+        for bit in 0..8 {
+            let tnt_bit = (tnt_bits & (1 << bit)) != 0;
+            let new_cached_key = self.process_tnt_bit_without_cache(context, tnt_bit)?;
+            if let Some(new_cached_key) = new_cached_key {
+                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+            }
+        }
+        if let Some(new_bb) = self.last_bb
+            && let Some(cached_key) = cached_key
+        {
+            self.cache_manager.insert_byte(
+                start_bb,
+                tnt_bits,
+                CachableInformation {
+                    user_data: cached_key,
+                    new_bb,
+                },
+            );
+        }
+        Ok(())
+    }
+
+    fn process_tnt_bit_without_cache(
         &mut self,
         context: &DecoderContext,
         is_taken: bool,
-    ) -> AnalyzerResult<(), H, R> {
+    ) -> AnalyzerResult<Option<H::CachedKey>, H, R> {
         let Some(last_bb) = self.last_bb else {
             // No previous TIP given. Silently ignore those TNTs
-            return Ok(());
+            return Ok(None);
         };
+        let mut cached_key = None;
         let mut last_bb = last_bb.get();
         'cfg_traverse: loop {
             let cfg_node =
@@ -106,16 +167,20 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             match terminator {
                 Branch { r#true, r#false } => {
                     last_bb = if is_taken { r#true } else { r#false };
-                    self.handler
+                    let new_cached_key = self
+                        .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                     break 'cfg_traverse;
                 }
                 DirectGoto { target } => {
                     last_bb = target;
-                    self.handler
+                    let new_cached_key = self
+                        .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                     continue 'cfg_traverse;
                 }
                 DirectCall {
@@ -123,9 +188,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     return_address,
                 } => {
                     last_bb = target;
-                    self.handler
+                    let new_cached_key = self
+                        .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                     self.callstack.push(return_address);
                     continue 'cfg_traverse;
                 }
@@ -143,9 +210,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         // The call will must have been recorded according to the specification
                         return Err(AnalyzerError::CorruptedCallstack);
                     };
-                    self.handler
+                    let new_cached_key = self
+                        .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::Return)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                 }
                 FarTransfers => {
                     // Far transfers will always emit FUP packets immediately
@@ -157,7 +226,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         // SAFETY: No instruction address could be zero
         self.last_bb = Some(unsafe { NonZero::new_unchecked(last_bb) });
 
-        Ok(())
+        Ok(cached_key)
     }
 }
 
@@ -211,4 +280,25 @@ where
 
         Ok(())
     }
+}
+
+fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
+    handler: &mut H,
+    cached_key: &mut Option<H::CachedKey>,
+    new_cached_key: Option<H::CachedKey>,
+) -> Result<(), AnalyzerError<H, R>> {
+    let Some(new_cached_key) = new_cached_key else {
+        return Ok(());
+    };
+    if let Some(old_cached_key) = cached_key.take() {
+        *cached_key = Some(
+            handler
+                .merge_cached_keys(old_cached_key, new_cached_key)
+                .map_err(AnalyzerError::ControlFlowHandler)?,
+        );
+    } else {
+        *cached_key = Some(new_cached_key);
+    }
+
+    Ok(())
 }

@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use hashbrown::{DefaultHashBuilder, HashMap, hash_map::Entry};
 
 #[derive(Hash, PartialEq, Eq)]
@@ -15,6 +17,7 @@ pub struct ControlFlowSequence {
 
 pub struct CachableInformation<D> {
     pub user_data: D,
+    pub new_bb: NonZero<u64>,
 }
 
 pub struct ControlFlowCacheManager<D> {
