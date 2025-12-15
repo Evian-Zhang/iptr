@@ -1,7 +1,5 @@
 use hashbrown::HashMap;
 
-use crate::TntProceed;
-
 #[derive(Hash, PartialEq, Eq)]
 enum CachedTnts {
     Dword([u8; 4]),
@@ -18,7 +16,6 @@ pub struct ControlFlowSequence {
 pub struct CachableInformation<D> {
     pub user_data: D,
     pub new_bb: u64,
-    pub tnt_proceed: TntProceed,
 }
 
 pub struct ControlFlowCacheManager<D> {
