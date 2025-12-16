@@ -1,3 +1,5 @@
+//! Caches for control flow in TNT bits and TIP packets.
+
 mod cache;
 use std::mem::MaybeUninit;
 
@@ -13,6 +15,9 @@ use crate::{
 };
 
 impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
+    /// Indicate that we have encountered a deferred TIP.
+    ///
+    /// This will re-inject the remaining TNT buffer, and set the [`pre_tip_status`][Self::pre_tip_status].
     fn mark_deferred_tip(&mut self, remain_tnt_buffer: TntBuffer, pre_tip_status: PreTipStatus) {
         self.tnt_buffer_manager.set_buf(remain_tnt_buffer);
         self.pre_tip_status = pre_tip_status;
@@ -20,7 +25,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
 
     /// Process a TNT buffer may or may not be full.
     ///
-    /// Note that this function may re-inject tnt buffer into `self.tnt_buffer_manager` if
+    /// Note that this function may re-inject tnt buffer into [`tnt_buffer_manager`][Self::tnt_buffer_manager] if
     /// a deferred TIP is detected (in that case, the remaining TNT bits should be processed
     /// AFTER the deferred TIP is processed)
     #[expect(clippy::cast_possible_truncation)]
@@ -299,6 +304,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     }
 }
 
+/// A convenient wrapper for [`merge_cached_keys`][HandleControlFlow::merge_cached_keys]
 pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
     handler: &mut H,
     cached_key: &mut Option<H::CachedKey>,

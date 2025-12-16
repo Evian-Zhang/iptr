@@ -37,16 +37,37 @@ enum TntProceed {
     },
 }
 
+/// Status for determining the semantic of next TIP packet
 #[derive(Clone, Copy)]
 enum PreTipStatus {
+    /// There is nothing related to the next TIP packet, or
+    /// the status is not yet determined
+    ///
+    /// For example, after the last TNT bit, the next CFG
+    /// node is still a direct branch. In this case, no TIP packet
+    /// status is forced.
     Normal,
+    /// The next CFG node is a RET instruction. Since we have
+    /// disabled return compression, the next TIP packet will always
+    /// be the return address.
     PendingReturn,
+    /// The next CFG node is an indirect JMP instruction.
     PendingIndirectGoto,
+    /// The next CFG node is an indirect CALL instruction.
     PendingIndirectCall,
+    /// There is a FUP packet before this packet. So there must be
+    /// a TIP or TIP.PGD packet.
     PendingFup,
+    /// There is an OVF packet before this packet. So there must be
+    /// a FUP, TIP or TIP.PGE packet.
     PendingOvf,
 }
 
+/// An edge analyzer that implements [`HandlePacket`] trait.
+///
+/// The analyzer will trace the control flow during the Intel PT packets, and invoke
+/// corresponding callbacks in the given control flow handler that implements
+/// [`HandleControlFlow`].
 pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     /// IP-reconstruction-specific field.
     ///
@@ -65,15 +86,23 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     /// internal parsing methods such as [`handle_tnt_buffer32`][Self::handle_tnt_buffer32].
     /// As a result, you should never read this field in those methods.
     last_bb: Option<NonZero<u64>>,
+    /// Status of the next TIP packet.
     pre_tip_status: PreTipStatus,
+    /// Buffering the TNT bits for better cache.
     tnt_buffer_manager: TntBufferManager,
+    /// Caches used to speed up TNT bits resolution without querying the CFG.
     cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
+    /// CFG node maintainer
     static_analyzer: StaticControlFlowAnalyzer,
+    /// Passed control flow handler
     handler: &'a mut H,
+    /// Passed memory reader
     reader: &'a mut R,
 }
 
 impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
+    /// Create a new edge analyzer
+    #[must_use]
     pub fn new(handler: &'a mut H, reader: &'a mut R) -> Self {
         Self {
             last_ip: 0,
@@ -87,6 +116,8 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         }
     }
 
+    /// Perform IP reconstruction and update the `last_ip` field,
+    /// returns the full-width IP address
     #[expect(
         clippy::cast_sign_loss,
         clippy::cast_possible_wrap,
@@ -119,6 +150,13 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Some(ip)
     }
 
+    /// Process the given TNT bit, querying the CFG graph without
+    /// using any cache.
+    ///
+    /// This function will return a tuple `(cached_key, tnt_proceed)` on success.
+    /// The return value is similar to [`handle_tnt_buffer8`][Self::handle_tnt_buffer8].
+    ///
+    /// Note that this function does not detect infinite loop
     #[expect(
         clippy::enum_glob_use,
         clippy::items_after_statements,
@@ -219,7 +257,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Ok((cached_key, tnt_proceed))
     }
 
-    /// Determine the status pre TIP packet.
+    /// Determine the status of the next TIP packet.
     ///
     /// This function is invoked upon a TIP packet is arrived and current
     /// `pre_tip_status` is just normal (which means the previous TNT bits
@@ -280,6 +318,73 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    /// Handle TIP or TIP.PGD since TIP.PGD can replace TIP packets if
+    /// the destination goes out of ranges.
+    fn handle_tip_or_tip_pgd_packet(
+        &mut self,
+        context: &DecoderContext,
+        ip_reconstruction_pattern: IpReconstructionPattern,
+    ) -> AnalyzerResult<(), H, R> {
+        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+            self.determine_pre_tip_status(context)?;
+        }
+        let mut last_bb =
+            if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
+                self.last_bb = NonZero::new(last_bb);
+                last_bb
+            } else {
+                // Last IP not changed
+                let Some(last_bb) = self.last_bb else {
+                    // No previous TIP given. So this TIP packet should give
+                    // right "Last IP".
+                    return Err(AnalyzerError::InvalidPacket);
+                };
+                last_bb.get()
+            };
+        match self.pre_tip_status {
+            PreTipStatus::Normal => {
+                // Nothing need to be done
+            }
+            PreTipStatus::PendingReturn => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::Return)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
+            }
+            PreTipStatus::PendingIndirectGoto => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectJump)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
+            }
+            PreTipStatus::PendingIndirectCall => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
+            }
+            PreTipStatus::PendingFup => {
+                self.pre_tip_status = PreTipStatus::Normal;
+                self.tnt_buffer_manager.clear();
+                return Ok(());
+            }
+            PreTipStatus::PendingOvf => {
+                // OVF should be followed by FUP or TIP.PGE
+                return Err(AnalyzerError::InvalidPacket);
+            }
+        }
+        // Clear the pending tnt buffers.
+        let tnt_buffer = self.tnt_buffer_manager.take();
+        let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
+        self.last_bb = NonZero::new(last_bb);
+        res?;
 
         Ok(())
     }
@@ -346,63 +451,19 @@ where
         context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Result<(), Self::Error> {
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
-            self.determine_pre_tip_status(context)?;
-        }
-        let mut last_bb =
-            if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
-                self.last_bb = NonZero::new(last_bb);
-                last_bb
-            } else {
-                // Last IP not changed
-                let Some(last_bb) = self.last_bb else {
-                    // No previous TIP given. So this TIP packet should give
-                    // right "Last IP".
-                    return Err(AnalyzerError::InvalidPacket);
-                };
-                last_bb.get()
-            };
-        match self.pre_tip_status {
-            PreTipStatus::Normal => {
-                // Nothing need to be done
-            }
-            PreTipStatus::PendingReturn => {
-                let _new_cached_key = self
-                    .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::Return)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingIndirectGoto => {
-                let _new_cached_key = self
-                    .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectJump)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingIndirectCall => {
-                let _new_cached_key = self
-                    .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingFup => {
-                self.pre_tip_status = PreTipStatus::Normal;
-                self.tnt_buffer_manager.clear();
-                return Ok(());
-            }
-            PreTipStatus::PendingOvf => {
-                // OVF should be followed by FUP or TIP.PGE
-                return Err(AnalyzerError::InvalidPacket);
-            }
-        }
-        // Clear the pending tnt buffers.
-        let tnt_buffer = self.tnt_buffer_manager.take();
-        let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
-        self.last_bb = NonZero::new(last_bb);
-        res?;
+        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern)?;
+        Ok(())
+    }
 
+    fn on_tip_pgd_packet(
+        &mut self,
+        context: &DecoderContext,
+        ip_reconstruction_pattern: IpReconstructionPattern,
+    ) -> Result<(), Self::Error> {
+        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern)?;
+
+        self.last_bb = None;
+        self.tnt_buffer_manager.clear();
         Ok(())
     }
 
@@ -428,20 +489,6 @@ where
         }
         self.tnt_buffer_manager.clear();
 
-        Ok(())
-    }
-
-    fn on_tip_pgd_packet(
-        &mut self,
-        _context: &DecoderContext,
-        ip_reconstruction_pattern: IpReconstructionPattern,
-    ) -> Result<(), Self::Error> {
-        if matches!(self.pre_tip_status, PreTipStatus::PendingFup) {
-            self.pre_tip_status = PreTipStatus::Normal;
-        }
-        self.reconstruct_ip_and_update_last(ip_reconstruction_pattern);
-        self.last_bb = None;
-        self.tnt_buffer_manager.clear();
         Ok(())
     }
 

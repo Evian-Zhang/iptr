@@ -1,8 +1,11 @@
+//! This module contains definition of errors made when analyzing with [`EdgeAnalyzer`][crate::EdgeAnalyzer].
+//!
 use perfect_derive::perfect_derive;
 use thiserror::Error;
 
 use crate::{HandleControlFlow, ReadMemory};
 
+/// Error for edge analysis
 #[derive(Error)]
 #[perfect_derive(Debug)]
 pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {

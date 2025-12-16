@@ -1,9 +1,13 @@
-/// A full TNT bits buffer
+//! TNT buffer structure
+
+/// A buffer for TNT bits
 ///
 /// This will only be retrieved from a [`TntBufferManager`]
 #[derive(Clone, Copy)]
 pub struct TntBuffer {
+    /// 64 bits container
     value: u64,
+    /// Number of used bits, no more than [`u64::BITS`].
     bits: u32,
 }
 
@@ -49,7 +53,9 @@ impl TntBuffer {
     }
 }
 
+/// Manager for TNT buffers
 pub struct TntBufferManager {
+    /// The internal buffer
     buf: TntBuffer,
 }
 
@@ -67,6 +73,8 @@ const SHORT_TNT_PREFIX_BIT_COUNT: u32 = 1;
 const LONG_TNT_PREFIX_BIT_COUNT: u32 = 0;
 
 impl TntBufferManager {
+    /// Create a new TNT buffer manager
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -77,6 +85,11 @@ impl TntBufferManager {
         self.buf.bits = 0;
     }
 
+    /// Insert TNT bits in a short TNT packet into the TNT buffer.
+    ///
+    /// This function will return a full 64-bits TNT buffer if current buffer
+    /// is full after the insertion
+    ///
     /// You must pass a short TNT format packet here
     #[must_use]
     pub fn extend_with_short_tnt(&mut self, short_tnt_packet: u8) -> Option<TntBuffer> {
@@ -119,10 +132,13 @@ impl TntBufferManager {
         }
     }
 
-    /// You must pass a long TNT format packet here.
+    /// Insert TNT bits in a long TNT packet into the TNT buffer.
     ///
-    /// The first two bytes must be stripped, as done by decoder.
-    /// As a result, the upmost two bytes are cleared.
+    /// This function will return a full 64-bits TNT buffer if current buffer
+    /// is full after the insertion
+    ///
+    /// You must pass a long TNT format packet here. The first two bytes must be stripped,
+    /// as done by decoder. As a result, the upmost two bytes of `long_tnt_packet` are cleared.
     #[must_use]
     pub fn extend_with_long_tnt(&mut self, long_tnt_packet: u64) -> Option<TntBuffer> {
         debug_assert_eq!(

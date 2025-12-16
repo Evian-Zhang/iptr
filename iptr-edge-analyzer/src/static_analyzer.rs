@@ -1,3 +1,5 @@
+//! This module contains static control flow analyzer
+
 use hashbrown::HashMap;
 use iced_x86::{Code, Decoder as IcedDecoder, DecoderOptions as IcedDecoderOptions, Instruction};
 use iptr_decoder::TraceeMode;
@@ -7,32 +9,50 @@ use crate::{
     error::{AnalyzerError, AnalyzerResult},
 };
 
+/// A node in CFG graph (CALL is also treated as a basic block terminator),
+/// which represents a basic block.
 pub struct CfgNode {
+    /// The terminator of this basic block
     pub terminator: CfgTerminator,
 }
 
+/// Terminator of a CFG node.
 #[derive(Clone, Copy)]
 pub enum CfgTerminator {
+    /// A conditional JMP
     Branch {
+        /// Address of Taken branch
         r#true: u64,
+        /// Address of Not Taken branch
         r#false: u64,
     },
+    /// A direct JMP
     DirectGoto {
+        /// Address of jump target
         target: u64,
     },
+    /// A direct CALL
     DirectCall {
+        /// Address of call target
         target: u64,
         /// Used for return compression, but currently this is not supported
         #[expect(unused)]
         return_address: u64,
     },
+    /// An indirect JMP
     IndirectGoto,
+    /// An indirect CALL
     IndirectCall,
+    /// A RET
     NearRet,
+    /// Other instructions that changes control flow
     FarTransfers,
 }
 
 impl CfgTerminator {
+    /// Convert an [`Instruction`] to a [`CfgTerminator`].
+    ///
+    /// Return [`None`] if this instruction does not change control flow.
     fn try_from(instruction: &Instruction) -> Option<Self> {
         let next_insn_addr = instruction.next_ip();
 
@@ -89,7 +109,10 @@ impl CfgTerminator {
     }
 }
 
+/// Static control flow analyzer, maintaining a CFG graph
 pub struct StaticControlFlowAnalyzer {
+    /// A CFG graph. Key: address of basic block, Value: basic block information
+    ///
     /// This will become very huge after running a long time
     cfg: HashMap<u64, CfgNode>,
 }
@@ -101,12 +124,22 @@ pub struct StaticControlFlowAnalyzer {
 const CFG_MAP_INITIAL_CAPACITY: usize = 0x10000;
 
 impl StaticControlFlowAnalyzer {
+    /// Create a new [`StaticControlFlowAnalyzer`]
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cfg: HashMap::with_capacity(CFG_MAP_INITIAL_CAPACITY),
         }
     }
 
+    /// Resolve the given `insn_addr` to a [`CfgNode`].
+    ///
+    /// The `insn_addr` should be the start address of a basic block, and
+    /// will always be inserted to the CFG graph.
+    ///
+    /// This function will read memory at `insn_addr` by querying the
+    /// `memory_reader`, and decoding the corresponding instruction until
+    /// reach a basic block terminator.
     pub fn resolve<H: HandleControlFlow, R: ReadMemory>(
         &mut self,
         memory_reader: &mut R,
