@@ -26,7 +26,8 @@ pub enum CfgTerminator {
         #[expect(unused)]
         return_address: u64,
     },
-    IndirectGotoOrCall,
+    IndirectGoto,
+    IndirectCall,
     NearRet,
     FarTransfers,
 }
@@ -43,8 +44,10 @@ impl CfgTerminator {
                 r#true: true_target,
                 r#false: false_target,
             })
-        } else if instruction.is_jmp_near_indirect() || instruction.is_call_near_indirect() {
-            Some(CfgTerminator::IndirectGotoOrCall)
+        } else if instruction.is_jmp_near_indirect() {
+            Some(CfgTerminator::IndirectGoto)
+        } else if instruction.is_call_near_indirect() {
+            Some(CfgTerminator::IndirectCall)
         } else if instruction.is_jmp_short_or_near() {
             let target = instruction.near_branch_target();
             Some(CfgTerminator::DirectGoto { target })

@@ -21,7 +21,19 @@ pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemo
 #[derive(Clone, Copy)]
 enum TntProceed {
     Continue,
-    Break { processed_bit_count: u32 },
+    Break {
+        processed_bit_count: u32,
+        pre_tip_status: PreTipStatus,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum PreTipStatus {
+    Normal,
+    PendingReturn,
+    PendingIndirectGoto,
+    PendingIndirectCall,
+    PendingFup,
 }
 
 pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
@@ -42,6 +54,7 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     /// internal parsing methods such as [`handle_tnt_buffer32`][Self::handle_tnt_buffer32].
     /// As a result, you should never read this field in those methods.
     last_bb: Option<NonZero<u64>>,
+    pre_tip_status: PreTipStatus,
     tnt_buffer_manager: TntBufferManager,
     cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
     static_analyzer: StaticControlFlowAnalyzer,
@@ -54,6 +67,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Self {
             last_ip: 0,
             last_bb: None,
+            pre_tip_status: PreTipStatus::Normal,
             tnt_buffer_manager: TntBufferManager::new(),
             cache_manager: ControlFlowCacheManager::new(),
             static_analyzer: StaticControlFlowAnalyzer::new(),
@@ -158,10 +172,19 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     )?;
                     continue 'cfg_traverse;
                 }
-                IndirectGotoOrCall => {
+                IndirectGoto => {
                     // Wait for deferred TIP
                     tnt_proceed = TntProceed::Break {
                         processed_bit_count: 0,
+                        pre_tip_status: PreTipStatus::PendingIndirectGoto,
+                    };
+                    break 'cfg_traverse;
+                }
+                IndirectCall => {
+                    // Wait for deferred TIP
+                    tnt_proceed = TntProceed::Break {
+                        processed_bit_count: 0,
+                        pre_tip_status: PreTipStatus::PendingIndirectCall,
                     };
                     break 'cfg_traverse;
                 }
@@ -172,10 +195,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         return Err(AnalyzerError::InvalidPacket);
                     }
                     return Err(AnalyzerError::UnsupportedReturnCompression);
-                    // let new_cached_key = self
-                    //     .handler
-                    //     .on_new_block(last_bb, ControlFlowTransitionKind::Return)
-                    //     .map_err(AnalyzerError::ControlFlowHandler)?;
                     // update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                 }
                 FarTransfers => {
@@ -187,6 +206,71 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         *last_bb_ref = last_bb;
 
         Ok((cached_key, tnt_proceed))
+    }
+
+    /// Determine the status pre TIP packet.
+    ///
+    /// This function is invoked upon a TIP packet is arrived and current
+    /// `pre_tip_status` is just normal (which means the previous TNT bits
+    /// have not met the deferred TIP). In this case, we need to check the
+    /// last CFG node for proper control flow handler invocation.
+    #[expect(
+        clippy::enum_glob_use,
+        clippy::items_after_statements,
+        clippy::needless_continue
+    )]
+    fn determine_pre_tip_status(&mut self, context: &DecoderContext) -> AnalyzerResult<(), H, R> {
+        let Some(last_bb) = self.last_bb else {
+            // No previous instruction
+            return Ok(());
+        };
+        let mut last_bb = last_bb.get();
+        'cfg_traverse: loop {
+            let cfg_node =
+                self.static_analyzer
+                    .resolve(self.reader, context.tracee_mode(), last_bb)?;
+            let terminator = cfg_node.terminator;
+            use static_analyzer::CfgTerminator::*;
+            match terminator {
+                Branch { .. } | FarTransfers => {
+                    // It's really normal.
+                    break 'cfg_traverse;
+                }
+                DirectGoto { target } => {
+                    last_bb = target;
+                    let _new_cached_key = self
+                        .handler
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
+                    continue 'cfg_traverse;
+                }
+                DirectCall {
+                    target,
+                    return_address: _,
+                } => {
+                    last_bb = target;
+                    let _new_cached_key = self
+                        .handler
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
+                    continue 'cfg_traverse;
+                }
+                IndirectGoto => {
+                    self.pre_tip_status = PreTipStatus::PendingIndirectGoto;
+                    break 'cfg_traverse;
+                }
+                IndirectCall => {
+                    self.pre_tip_status = PreTipStatus::PendingIndirectCall;
+                    break 'cfg_traverse;
+                }
+                NearRet => {
+                    self.pre_tip_status = PreTipStatus::PendingReturn;
+                    break 'cfg_traverse;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -251,17 +335,50 @@ where
         context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Result<(), Self::Error> {
+        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+            self.determine_pre_tip_status(context)?;
+        }
         let mut last_bb =
             if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
                 self.last_bb = NonZero::new(last_bb);
                 last_bb
             } else {
+                // Last IP not changed
                 let Some(last_bb) = self.last_bb else {
-                    // No previous TIP given. Silently ignore those TNTs
-                    return Ok(());
+                    // No previous TIP given. So this TIP packet should give
+                    // right "Last IP".
+                    return Err(AnalyzerError::InvalidPacket);
                 };
                 last_bb.get()
             };
+        match self.pre_tip_status {
+            PreTipStatus::Normal => {
+                // Nothing need to be done
+            }
+            PreTipStatus::PendingReturn => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::Return)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
+            PreTipStatus::PendingIndirectGoto => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectJump)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
+            PreTipStatus::PendingIndirectCall => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
+            PreTipStatus::PendingFup => {
+                // TODO: ...
+                return Ok(());
+            }
+        }
+        // Clear the pending tnt buffers.
         let tnt_buffer = self.tnt_buffer_manager.take();
         let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
         self.last_bb = NonZero::new(last_bb);
