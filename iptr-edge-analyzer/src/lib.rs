@@ -34,6 +34,7 @@ enum PreTipStatus {
     PendingIndirectGoto,
     PendingIndirectCall,
     PendingFup,
+    PendingOvf,
 }
 
 pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
@@ -360,22 +361,29 @@ where
                     .handler
                     .on_new_block(last_bb, ControlFlowTransitionKind::Return)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectGoto => {
                 let _new_cached_key = self
                     .handler
                     .on_new_block(last_bb, ControlFlowTransitionKind::IndirectJump)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectCall => {
                 let _new_cached_key = self
                     .handler
                     .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFup => {
                 // TODO: ...
                 return Ok(());
+            }
+            PreTipStatus::PendingOvf => {
+                // OVF should be followed by FUP or TIP.PGE
+                return Err(AnalyzerError::InvalidPacket);
             }
         }
         // Clear the pending tnt buffers.
@@ -384,6 +392,71 @@ where
         self.last_bb = NonZero::new(last_bb);
         res?;
 
+        Ok(())
+    }
+
+    fn on_tip_pge_packet(
+        &mut self,
+        _context: &DecoderContext,
+        ip_reconstruction_pattern: IpReconstructionPattern,
+    ) -> Result<(), Self::Error> {
+        if matches!(self.pre_tip_status, PreTipStatus::PendingOvf) {
+            let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern)
+            else {
+                // Any IP compression that follows the OVF is guaranteed to
+                // use as a reference `LastIP` the IP payload of an IP packet
+                return Err(AnalyzerError::InvalidPacket);
+            };
+            self.last_bb = NonZero::new(last_bb);
+            self.pre_tip_status = PreTipStatus::Normal;
+            self.tnt_buffer_manager.clear();
+            return Ok(());
+        }
+        if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
+            self.last_bb = NonZero::new(last_bb);
+        }
+        self.tnt_buffer_manager.clear();
+
+        Ok(())
+    }
+
+    fn on_tip_pgd_packet(
+        &mut self,
+        _context: &DecoderContext,
+        ip_reconstruction_pattern: IpReconstructionPattern,
+    ) -> Result<(), Self::Error> {
+        self.reconstruct_ip_and_update_last(ip_reconstruction_pattern);
+        self.last_bb = None;
+        self.tnt_buffer_manager.clear();
+        Ok(())
+    }
+
+    fn on_fup_packet(
+        &mut self,
+        _context: &DecoderContext,
+        ip_reconstruction_pattern: IpReconstructionPattern,
+    ) -> Result<(), Self::Error> {
+        if matches!(self.pre_tip_status, PreTipStatus::PendingOvf) {
+            self.pre_tip_status = PreTipStatus::Normal;
+            let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern)
+            else {
+                // Any IP compression that follows the OVF is guaranteed to
+                // use as a reference `LastIP` the IP payload of an IP packet
+                return Err(AnalyzerError::InvalidPacket);
+            };
+            self.last_bb = NonZero::new(last_bb);
+            self.tnt_buffer_manager.clear();
+
+            return Ok(());
+        }
+        self.reconstruct_ip_and_update_last(ip_reconstruction_pattern);
+        self.pre_tip_status = PreTipStatus::PendingFup;
+
+        Ok(())
+    }
+
+    fn on_ovf_packet(&mut self, _context: &DecoderContext) -> Result<(), Self::Error> {
+        self.pre_tip_status = PreTipStatus::PendingOvf;
         Ok(())
     }
 }

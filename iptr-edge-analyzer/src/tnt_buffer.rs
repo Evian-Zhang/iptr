@@ -71,6 +71,12 @@ impl TntBufferManager {
         Self::default()
     }
 
+    /// Clear current TNT buffer
+    pub fn clear(&mut self) {
+        self.buf.value = 0;
+        self.buf.bits = 0;
+    }
+
     /// You must pass a short TNT format packet here
     #[must_use]
     pub fn extend_with_short_tnt(&mut self, short_tnt_packet: u8) -> Option<TntBuffer> {
@@ -173,8 +179,7 @@ impl TntBufferManager {
     /// a new buffer in place.
     pub fn take(&mut self) -> TntBuffer {
         let buf = self.buf;
-        self.buf.value = 0;
-        self.buf.bits = 0;
+        self.clear();
         buf.ready_for_public_usage()
     }
 }
