@@ -18,11 +18,21 @@ use crate::{
 };
 pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemory};
 
+/// TNT bits processing status
 #[derive(Clone, Copy)]
 enum TntProceed {
+    /// During the process of current TNT bits, there
+    /// is no deferred TIP detected
     Continue,
+    /// During the process of current TNT bits, a deferred
+    /// TIP is detected.
     Break {
+        /// Before this deferred TIP, there are already this number
+        /// of TNT bits processed.
         processed_bit_count: u32,
+        /// Reason for the deferred TIP.
+        ///
+        /// This can reduce the number of CFG resolutions.
         pre_tip_status: PreTipStatus,
     },
 }
@@ -378,7 +388,8 @@ where
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFup => {
-                // TODO: ...
+                self.pre_tip_status = PreTipStatus::Normal;
+                self.tnt_buffer_manager.clear();
                 return Ok(());
             }
             PreTipStatus::PendingOvf => {
@@ -425,6 +436,9 @@ where
         _context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Result<(), Self::Error> {
+        if matches!(self.pre_tip_status, PreTipStatus::PendingFup) {
+            self.pre_tip_status = PreTipStatus::Normal;
+        }
         self.reconstruct_ip_and_update_last(ip_reconstruction_pattern);
         self.last_bb = None;
         self.tnt_buffer_manager.clear();
@@ -457,6 +471,15 @@ where
 
     fn on_ovf_packet(&mut self, _context: &DecoderContext) -> Result<(), Self::Error> {
         self.pre_tip_status = PreTipStatus::PendingOvf;
+        Ok(())
+    }
+
+    fn on_psb_packet(&mut self, _context: &DecoderContext) -> Result<(), Self::Error> {
+        self.last_bb = None;
+        self.last_ip = 0;
+        self.pre_tip_status = PreTipStatus::Normal;
+        self.tnt_buffer_manager.clear();
+
         Ok(())
     }
 }
