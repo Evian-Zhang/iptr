@@ -9,7 +9,7 @@ pub enum ControlFlowTransitionKind {
 
 pub trait HandleControlFlow {
     type Error: std::error::Error;
-    type CachedKey: Copy;
+    type CachedKey: Clone;
 
     fn on_new_block(
         &mut self,
@@ -17,7 +17,7 @@ pub trait HandleControlFlow {
         transition_kind: ControlFlowTransitionKind,
     ) -> Result<Option<Self::CachedKey>, Self::Error>;
 
-    fn on_reused_cache(&mut self, cached_key: Self::CachedKey) -> Result<(), Self::Error>;
+    fn on_reused_cache(&mut self, cached_key: &Self::CachedKey) -> Result<(), Self::Error>;
 
     fn merge_cached_keys(
         &mut self,

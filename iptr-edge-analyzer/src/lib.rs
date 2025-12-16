@@ -10,11 +10,11 @@ use std::num::NonZero;
 use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 use crate::{
-    control_flow_cache::{CachableInformation, ControlFlowCacheManager},
+    control_flow_cache::ControlFlowCacheManager,
     control_flow_handler::ControlFlowTransitionKind,
     error::{AnalyzerError, AnalyzerResult},
     static_analyzer::StaticControlFlowAnalyzer,
-    tnt_buffer::{TntBuffer, TntBufferManager},
+    tnt_buffer::TntBufferManager,
 };
 pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemory};
 
@@ -94,228 +94,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Some(ip)
     }
 
-    /// Process a TNT buffer may or may not be full.
-    ///
-    /// Note that this function may re-inject tnt buffer into `self.tnt_buffer_manager` if
-    /// a deferred TIP is detected (in that case, the remaining TNT bits should be processed
-    /// AFTER the deferred TIP is processed)
-    #[expect(clippy::cast_possible_truncation)]
-    fn handle_maybe_full_tnt_buffer(
-        &mut self,
-        context: &DecoderContext,
-        last_bb_ref: &mut u64,
-        tnt_buffer: TntBuffer,
-    ) -> AnalyzerResult<(), H, R> {
-        let mut remain_bits = tnt_buffer.bits();
-        if remain_bits == 0 {
-            return Ok(());
-        }
-        let mut remain_buffer_value = u64::from_le_bytes(tnt_buffer.get_array_qword());
-        let mut total_processed_bit_count = 0;
-        while remain_bits >= u32::BITS {
-            let tnt_proceed = self.handle_tnt_buffer32(
-                context,
-                last_bb_ref,
-                (remain_buffer_value as u32).to_ne_bytes(),
-            )?;
-            if let TntProceed::Break {
-                processed_bit_count,
-            } = tnt_proceed
-            {
-                let remain_buf =
-                    tnt_buffer.remove_first_n_bits(processed_bit_count + total_processed_bit_count);
-                self.tnt_buffer_manager.set_buf(remain_buf);
-                return Ok(());
-            }
-            remain_bits -= u32::BITS;
-            remain_buffer_value >>= u32::BITS;
-            total_processed_bit_count += u32::BITS;
-        }
-        while remain_bits >= u8::BITS {
-            let (_new_cached_key, tnt_proceed) =
-                self.handle_tnt_buffer8(context, last_bb_ref, remain_buffer_value as u8)?;
-            if let TntProceed::Break {
-                processed_bit_count,
-            } = tnt_proceed
-            {
-                let remain_buf =
-                    tnt_buffer.remove_first_n_bits(processed_bit_count + total_processed_bit_count);
-                self.tnt_buffer_manager.set_buf(remain_buf);
-                return Ok(());
-            }
-            remain_bits -= u8::BITS;
-            remain_buffer_value >>= u8::BITS;
-            total_processed_bit_count += u8::BITS;
-        }
-        while remain_bits != 0 {
-            let tnt_bit = (remain_buffer_value & 0b1) != 0;
-            let (_new_cached_key, tnt_proceed) =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
-            if matches!(tnt_proceed, TntProceed::Break { .. }) {
-                // Current bit is not processed, and reserved for processing after next TIP
-                let remain_buf = tnt_buffer.remove_first_n_bits(total_processed_bit_count);
-                self.tnt_buffer_manager.set_buf(remain_buf);
-                return Ok(());
-            }
-            remain_bits -= 1;
-            remain_buffer_value >>= 1;
-            total_processed_bit_count += 1;
-        }
-
-        Ok(())
-    }
-
-    /// A fast path for [`handle_maybe_full_tnt_buffer`][Self::handle_maybe_full_tnt_buffer] if
-    /// the tnt buffer is full
-    fn handle_full_tnt_buffer(
-        &mut self,
-        context: &DecoderContext,
-        last_bb_ref: &mut u64,
-        tnt_buffer: TntBuffer,
-    ) -> AnalyzerResult<(), H, R> {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = tnt_buffer.get_array_qword();
-        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count);
-            self.tnt_buffer_manager.set_buf(remain_buf);
-            return Ok(());
-        }
-        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b4, b5, b6, b7])?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count + u32::BITS);
-            self.tnt_buffer_manager.set_buf(remain_buf);
-            return Ok(());
-        }
-
-        Ok(())
-    }
-
-    fn handle_tnt_buffer32(
-        &mut self,
-        context: &DecoderContext,
-        last_bb_ref: &mut u64,
-        tnt_buffer: [u8; 4],
-    ) -> AnalyzerResult<TntProceed, H, R> {
-        if let Some(cached_info) = self.cache_manager.get_dword(*last_bb_ref, tnt_buffer) {
-            *last_bb_ref = cached_info.new_bb;
-            if let Some(cached_key) = cached_info.user_data {
-                self.handler
-                    .on_reused_cache(cached_key)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-            }
-
-            return Ok(TntProceed::Continue);
-        }
-        let start_bb = *last_bb_ref;
-        let mut cached_key = None;
-        let [b0, b1, b2, b3] = tnt_buffer;
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b0)?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            return Ok(TntProceed::Break {
-                processed_bit_count,
-            });
-        }
-        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b1)?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            return Ok(TntProceed::Break {
-                processed_bit_count: processed_bit_count + u8::BITS,
-            });
-        }
-        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b2)?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            return Ok(TntProceed::Break {
-                processed_bit_count: processed_bit_count + u8::BITS * 2,
-            });
-        }
-        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b3)?;
-        if let TntProceed::Break {
-            processed_bit_count,
-        } = tnt_proceed
-        {
-            return Ok(TntProceed::Break {
-                processed_bit_count: processed_bit_count + u8::BITS * 3,
-            });
-        }
-        update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-        // The cache will only be inserted if `TntProceed` is always `Continue`
-        self.cache_manager.insert_dword(
-            start_bb,
-            tnt_buffer,
-            CachableInformation {
-                user_data: cached_key,
-                new_bb: *last_bb_ref,
-            },
-        );
-
-        Ok(tnt_proceed)
-    }
-
-    fn handle_tnt_buffer8(
-        &mut self,
-        context: &DecoderContext,
-        last_bb_ref: &mut u64,
-        tnt_bits: u8,
-    ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
-        if let Some(cached_info) = self.cache_manager.get_byte(*last_bb_ref, tnt_bits) {
-            *last_bb_ref = cached_info.new_bb;
-            if let Some(cached_key) = &cached_info.user_data {
-                self.handler
-                    .on_reused_cache(*cached_key)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-            }
-
-            return Ok((cached_info.user_data, TntProceed::Continue));
-        }
-        let mut cached_key = None;
-        let start_bb = *last_bb_ref;
-        // The default value does not matter. The for-loop must run at least once
-        let mut tnt_proceed = TntProceed::Continue;
-        for bit in 0..8 {
-            let tnt_bit = (tnt_bits & (1 << bit)) != 0;
-            let (new_cached_key, this_tnt_proceed) =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
-            tnt_proceed = this_tnt_proceed;
-            if matches!(tnt_proceed, TntProceed::Break { .. }) {
-                // Current bit is not processed, and reserved for processing after next TIP
-                return Ok((
-                    cached_key,
-                    TntProceed::Break {
-                        processed_bit_count: bit,
-                    },
-                ));
-            }
-            update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-        }
-        // The cache will only be inserted if `TntProceed` is always `Continue`
-        self.cache_manager.insert_byte(
-            start_bb,
-            tnt_bits,
-            CachableInformation {
-                user_data: cached_key,
-                new_bb: *last_bb_ref,
-            },
-        );
-        Ok((cached_key, tnt_proceed))
-    }
-
     #[expect(
         clippy::enum_glob_use,
         clippy::items_after_statements,
@@ -343,7 +121,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+                    control_flow_cache::update_cached_key(
+                        self.handler,
+                        &mut cached_key,
+                        new_cached_key,
+                    )?;
                     tnt_proceed = TntProceed::Continue;
                     break 'cfg_traverse;
                 }
@@ -353,7 +135,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+                    control_flow_cache::update_cached_key(
+                        self.handler,
+                        &mut cached_key,
+                        new_cached_key,
+                    )?;
                     continue 'cfg_traverse;
                 }
                 DirectCall {
@@ -365,7 +151,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+                    control_flow_cache::update_cached_key(
+                        self.handler,
+                        &mut cached_key,
+                        new_cached_key,
+                    )?;
                     continue 'cfg_traverse;
                 }
                 IndirectGotoOrCall => {
@@ -479,25 +269,4 @@ where
 
         Ok(())
     }
-}
-
-fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
-    handler: &mut H,
-    cached_key: &mut Option<H::CachedKey>,
-    new_cached_key: Option<H::CachedKey>,
-) -> Result<(), AnalyzerError<H, R>> {
-    let Some(new_cached_key) = new_cached_key else {
-        return Ok(());
-    };
-    if let Some(old_cached_key) = cached_key.take() {
-        *cached_key = Some(
-            handler
-                .merge_cached_keys(old_cached_key, new_cached_key)
-                .map_err(AnalyzerError::ControlFlowHandler)?,
-        );
-    } else {
-        *cached_key = Some(new_cached_key);
-    }
-
-    Ok(())
 }
