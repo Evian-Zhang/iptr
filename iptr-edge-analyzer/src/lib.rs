@@ -11,12 +11,14 @@ use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 use crate::{
     control_flow_cache::ControlFlowCacheManager,
-    control_flow_handler::ControlFlowTransitionKind,
     error::{AnalyzerError, AnalyzerResult},
     static_analyzer::StaticControlFlowAnalyzer,
     tnt_buffer::TntBufferManager,
 };
-pub use crate::{control_flow_handler::HandleControlFlow, memory_reader::ReadMemory};
+pub use crate::{
+    control_flow_handler::{ControlFlowTransitionKind, HandleControlFlow},
+    memory_reader::ReadMemory,
+};
 
 /// TNT bits processing status
 #[derive(Clone, Copy)]

@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
 pub mod error;
 pub mod packet_handler;
 mod raw_packet_handler;

@@ -247,6 +247,7 @@ name = "iptr-decoder"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "log",
  "memchr",
  "perfect-derive",
  "thiserror",
@@ -276,6 +277,7 @@ dependencies = [
  "iptr-perf-pt-reader",
  "log",
  "memmap2",
+ "thiserror",
 ]
 
 [[package]]
