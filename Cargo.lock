@@ -265,6 +265,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "iptr-perf-pt-analyzer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "iptr-decoder",
+ "iptr-edge-analyzer",
+ "iptr-perf-pt-reader",
+ "log",
+ "memmap2",
+]
+
+[[package]]
 name = "iptr-perf-pt-extractor"
 version = "0.1.0"
 dependencies = [

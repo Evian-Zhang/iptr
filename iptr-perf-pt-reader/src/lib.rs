@@ -58,7 +58,7 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
 #[expect(clippy::cast_possible_truncation)]
 pub fn extract_pt_auxtraces_and_mmap_data(
     perf_data: &[u8],
-) -> ReaderResult<Vec<PerfRecordAuxtrace<'_>>> {
+) -> ReaderResult<(Vec<PerfRecordAuxtrace<'_>>, Vec<PerfMmap2Header>)> {
     let mut pt_auxtraces = Vec::new();
     let mut mmap2_headers = Vec::new();
 
@@ -102,7 +102,7 @@ pub fn extract_pt_auxtraces_and_mmap_data(
         }
     }
 
-    Ok(pt_auxtraces)
+    Ok((pt_auxtraces, mmap2_headers))
 }
 
 fn read_perf_header(perf_data: &[u8]) -> ReaderResult<(u64, u64)> {
