@@ -356,6 +356,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 // Out-of-context IP
                 if is_pgd {
                     // SYSCALL into kernel codes...
+                    self.pre_tip_status = PreTipStatus::Normal;
                     return Ok(());
                 } else {
                     // Single TIP packet emit a out-of-context IP?
@@ -522,6 +523,7 @@ where
                 .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
                 .map_err(AnalyzerError::ControlFlowHandler)?;
         }
+        self.pre_tip_status = PreTipStatus::Normal;
         self.tnt_buffer_manager.clear();
 
         Ok(())
