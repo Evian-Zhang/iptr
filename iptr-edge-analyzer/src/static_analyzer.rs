@@ -46,7 +46,11 @@ pub enum CfgTerminator {
     /// A RET
     NearRet,
     /// Other instructions that changes control flow
-    FarTransfers,
+    FarTransfers {
+        /// Address of instruction next to current instruction
+        #[expect(unused)]
+        next_instruction: u64,
+    },
 }
 
 impl CfgTerminator {
@@ -102,7 +106,7 @@ impl CfgTerminator {
                 | Code::Vmlaunch | Code::Vmresume
                 | Code::Ud0 | Code::Ud0_r16_rm16 | Code::Ud0_r32_rm32 | Code::Ud0_r64_rm64
                 | Code::Ud1_r16_rm16 | Code::Ud1_r32_rm32 | Code::Ud1_r64_rm64
-                | Code::Ud2 => Some(CfgTerminator::FarTransfers),
+                | Code::Ud2 => Some(CfgTerminator::FarTransfers { next_instruction: next_insn_addr }),
                 _ => None,
             }
         }

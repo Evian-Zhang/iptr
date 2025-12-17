@@ -1,5 +1,10 @@
 //! TNT buffer structure
 
+use crate::{
+    HandleControlFlow, ReadMemory,
+    error::{AnalyzerError, AnalyzerResult},
+};
+
 /// A buffer for TNT bits
 ///
 /// This will only be retrieved from a [`TntBufferManager`]
@@ -186,9 +191,21 @@ impl TntBufferManager {
         }
     }
 
-    /// Set current tnt buffer
-    pub fn set_buf(&mut self, buf: TntBuffer) {
-        self.buf = buf;
+    /// Prepend given buf to the internal TNT buffer.
+    ///
+    /// This function will return error if the TNT buffer exceeded.
+    pub fn prepend_buf<H: HandleControlFlow, R: ReadMemory>(
+        &mut self,
+        buf: TntBuffer,
+    ) -> AnalyzerResult<(), H, R> {
+        if self.buf.bits() + buf.bits() > u64::BITS {
+            return Err(AnalyzerError::ExceededTntBuffer);
+        }
+        self.buf.value = self.buf.value.wrapping_shl(buf.bits());
+        self.buf.value |= buf.value & (u64::MAX.wrapping_shr(u64::BITS - buf.bits()));
+        self.buf.bits += buf.bits();
+
+        Ok(())
     }
 
     /// Take current tnt buffer out of the manager, leaving

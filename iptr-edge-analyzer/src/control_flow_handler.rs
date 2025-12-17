@@ -12,6 +12,13 @@ pub enum ControlFlowTransitionKind {
     IndirectCall,
     /// RET
     Return,
+    /// Far transfers
+    FarTransfer,
+    /// New block
+    ///
+    /// Basic blocks that cannot be categorized into
+    /// other reasons
+    NewBlock,
 }
 
 /// Control flow handler used for [`EdgeAnalyzer`][crate::EdgeAnalyzer]

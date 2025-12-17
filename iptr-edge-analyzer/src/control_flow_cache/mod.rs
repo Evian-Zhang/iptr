@@ -18,9 +18,15 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     /// Indicate that we have encountered a deferred TIP.
     ///
     /// This will re-inject the remaining TNT buffer, and set the [`pre_tip_status`][Self::pre_tip_status].
-    fn mark_deferred_tip(&mut self, remain_tnt_buffer: TntBuffer, pre_tip_status: PreTipStatus) {
-        self.tnt_buffer_manager.set_buf(remain_tnt_buffer);
+    fn mark_deferred_tip(
+        &mut self,
+        remain_tnt_buffer: TntBuffer,
+        pre_tip_status: PreTipStatus,
+    ) -> AnalyzerResult<(), H, R> {
+        self.tnt_buffer_manager.prepend_buf(remain_tnt_buffer)?;
         self.pre_tip_status = pre_tip_status;
+
+        Ok(())
     }
 
     /// Process a TNT buffer may or may not be full.
@@ -54,7 +60,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             {
                 let remain_buf =
                     tnt_buffer.remove_first_n_bits(processed_bit_count + total_processed_bit_count);
-                self.mark_deferred_tip(remain_buf, pre_tip_status);
+                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
             remain_bits -= u32::BITS;
@@ -71,7 +77,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             {
                 let remain_buf =
                     tnt_buffer.remove_first_n_bits(processed_bit_count + total_processed_bit_count);
-                self.mark_deferred_tip(remain_buf, pre_tip_status);
+                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
             remain_bits -= u8::BITS;
@@ -89,7 +95,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             {
                 // Current bit is not processed, and reserved for processing after next TIP
                 let remain_buf = tnt_buffer.remove_first_n_bits(total_processed_bit_count);
-                self.mark_deferred_tip(remain_buf, pre_tip_status);
+                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
             remain_bits -= 1;
@@ -116,7 +122,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         } = tnt_proceed
         {
             let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count);
-            self.mark_deferred_tip(remain_buf, pre_tip_status);
+            self.mark_deferred_tip(remain_buf, pre_tip_status)?;
             return Ok(());
         }
         let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b4, b5, b6, b7])?;
@@ -126,7 +132,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         } = tnt_proceed
         {
             let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count + u32::BITS);
-            self.mark_deferred_tip(remain_buf, pre_tip_status);
+            self.mark_deferred_tip(remain_buf, pre_tip_status)?;
             return Ok(());
         }
 

@@ -29,6 +29,12 @@ pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {
     /// the callstack in the cache, which is very hard to design a efficient way
     #[error("Return compression is not supported")]
     UnsupportedReturnCompression,
+    /// TNT buffer exceeded.
+    ///
+    /// This is unexpected, and may occur when we re-inject TNT buffers
+    /// into manager when a deferred TIP is detected
+    #[error("Unexpected! TNT buffer exceeded!")]
+    ExceededTntBuffer,
     /// Unexpected edge analyzer error
     #[error("Unexpected edge analyzer error")]
     Unexpected,

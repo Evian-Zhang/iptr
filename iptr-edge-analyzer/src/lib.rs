@@ -55,6 +55,8 @@ enum PreTipStatus {
     PendingIndirectGoto,
     /// The next CFG node is an indirect CALL instruction.
     PendingIndirectCall,
+    /// The next CFG node is a far transfer instruction such as SYSCALL
+    PendingFarTransfer,
     /// There is a FUP packet before this packet. So there must be
     /// a TIP or TIP.PGD packet.
     PendingFup,
@@ -246,9 +248,15 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     return Err(AnalyzerError::UnsupportedReturnCompression);
                     // update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                 }
-                FarTransfers => {
-                    // Far transfers will always emit FUP packets immediately
-                    return Err(AnalyzerError::InvalidPacket);
+                FarTransfers {
+                    next_instruction: _,
+                } => {
+                    // Wait for deferred TIP
+                    tnt_proceed = TntProceed::Break {
+                        processed_bit_count: 0,
+                        pre_tip_status: PreTipStatus::PendingFarTransfer,
+                    };
+                    break 'cfg_traverse;
                 }
             }
         }
@@ -281,7 +289,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             let terminator = cfg_node.terminator;
             use static_analyzer::CfgTerminator::*;
             match terminator {
-                Branch { .. } | FarTransfers => {
+                Branch { .. } => {
                     // It's really normal.
                     break 'cfg_traverse;
                 }
@@ -316,6 +324,12 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     self.pre_tip_status = PreTipStatus::PendingReturn;
                     break 'cfg_traverse;
                 }
+                FarTransfers {
+                    next_instruction: _,
+                } => {
+                    self.pre_tip_status = PreTipStatus::PendingFarTransfer;
+                    break 'cfg_traverse;
+                }
             }
         }
 
@@ -324,10 +338,12 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
 
     /// Handle TIP or TIP.PGD since TIP.PGD can replace TIP packets if
     /// the destination goes out of ranges.
+    #[expect(clippy::redundant_else)]
     fn handle_tip_or_tip_pgd_packet(
         &mut self,
         context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
+        is_pgd: bool,
     ) -> AnalyzerResult<(), H, R> {
         if matches!(self.pre_tip_status, PreTipStatus::Normal) {
             self.determine_pre_tip_status(context)?;
@@ -337,17 +353,21 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 self.last_bb = NonZero::new(last_bb);
                 last_bb
             } else {
-                // Last IP not changed
-                let Some(last_bb) = self.last_bb else {
-                    // No previous TIP given. So this TIP packet should give
-                    // right "Last IP".
+                // Out-of-context IP
+                if is_pgd {
+                    // SYSCALL into kernel codes...
+                    return Ok(());
+                } else {
+                    // Single TIP packet emit a out-of-context IP?
                     return Err(AnalyzerError::InvalidPacket);
-                };
-                last_bb.get()
+                }
             };
         match self.pre_tip_status {
             PreTipStatus::Normal => {
-                // Nothing need to be done
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
             }
             PreTipStatus::PendingReturn => {
                 let _new_cached_key = self
@@ -367,6 +387,13 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 let _new_cached_key = self
                     .handler
                     .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+                self.pre_tip_status = PreTipStatus::Normal;
+            }
+            PreTipStatus::PendingFarTransfer => {
+                let _new_cached_key = self
+                    .handler
+                    .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
@@ -451,7 +478,7 @@ where
         context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Result<(), Self::Error> {
-        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern)?;
+        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern, false)?;
         Ok(())
     }
 
@@ -460,7 +487,7 @@ where
         context: &DecoderContext,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Result<(), Self::Error> {
-        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern)?;
+        self.handle_tip_or_tip_pgd_packet(context, ip_reconstruction_pattern, true)?;
 
         self.last_bb = None;
         self.tnt_buffer_manager.clear();
@@ -482,10 +509,18 @@ where
             self.last_bb = NonZero::new(last_bb);
             self.pre_tip_status = PreTipStatus::Normal;
             self.tnt_buffer_manager.clear();
+            let _new_cached_key = self
+                .handler
+                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                .map_err(AnalyzerError::ControlFlowHandler)?;
             return Ok(());
         }
         if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
             self.last_bb = NonZero::new(last_bb);
+            let _new_cached_key = self
+                .handler
+                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                .map_err(AnalyzerError::ControlFlowHandler)?;
         }
         self.tnt_buffer_manager.clear();
 
