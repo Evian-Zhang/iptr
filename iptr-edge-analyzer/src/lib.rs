@@ -21,7 +21,7 @@ pub use crate::{
 };
 
 /// TNT bits processing status
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum TntProceed {
     /// During the process of current TNT bits, there
     /// is no deferred TIP detected
@@ -40,7 +40,7 @@ enum TntProceed {
 }
 
 /// Status for determining the semantic of next TIP packet
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum PreTipStatus {
     /// There is nothing related to the next TIP packet, or
     /// the status is not yet determined
@@ -347,24 +347,31 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         ip_reconstruction_pattern: IpReconstructionPattern,
         is_pgd: bool,
     ) -> AnalyzerResult<(), H, R> {
+        if let Some(last_bb) = self.last_bb {
+            // There are already some valid TNT packets here since
+            // last_bb is not uninitialized
+            let mut last_bb = last_bb.get();
+            // Clear the pending tnt buffers.
+            let tnt_buffer = self.tnt_buffer_manager.take();
+            let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
+            self.last_bb = NonZero::new(last_bb);
+            res?;
+        }
         if matches!(self.pre_tip_status, PreTipStatus::Normal) {
             self.determine_pre_tip_status(context)?;
         }
-        let mut last_bb =
-            if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
-                self.last_bb = NonZero::new(last_bb);
-                last_bb
+        let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) else {
+            // Out-of-context IP
+            if is_pgd {
+                // SYSCALL into kernel codes...
+                self.pre_tip_status = PreTipStatus::Normal;
+                return Ok(());
             } else {
-                // Out-of-context IP
-                if is_pgd {
-                    // SYSCALL into kernel codes...
-                    self.pre_tip_status = PreTipStatus::Normal;
-                    return Ok(());
-                } else {
-                    // Single TIP packet emit a out-of-context IP?
-                    return Err(AnalyzerError::InvalidPacket);
-                }
-            };
+                // Single TIP packet emit a out-of-context IP?
+                return Err(AnalyzerError::InvalidPacket);
+            }
+        };
+        self.last_bb = NonZero::new(last_bb);
         match self.pre_tip_status {
             PreTipStatus::Normal => {
                 let _new_cached_key = self
@@ -410,11 +417,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 return Err(AnalyzerError::InvalidPacket);
             }
         }
-        // Clear the pending tnt buffers.
-        let tnt_buffer = self.tnt_buffer_manager.take();
-        let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
-        self.last_bb = NonZero::new(last_bb);
-        res?;
 
         Ok(())
     }

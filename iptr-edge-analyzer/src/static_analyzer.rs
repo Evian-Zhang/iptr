@@ -17,7 +17,7 @@ pub struct CfgNode {
 }
 
 /// Terminator of a CFG node.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum CfgTerminator {
     /// A conditional JMP
     Branch {
