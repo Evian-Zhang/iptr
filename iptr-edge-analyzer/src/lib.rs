@@ -338,6 +338,21 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         Ok(())
     }
 
+    /// Process all remaining TNT bits inside tnt buffer manager
+    fn process_all_pending_tnts(&mut self, context: &DecoderContext) -> AnalyzerResult<(), H, R> {
+        let Some(last_bb) = self.last_bb else {
+            return Ok(());
+        };
+        // There are already some valid TNT packets here since
+        // last_bb is not uninitialized
+        let mut last_bb = last_bb.get();
+        // Clear the pending tnt buffers.
+        let tnt_buffer = self.tnt_buffer_manager.take();
+        let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
+        self.last_bb = NonZero::new(last_bb);
+        res
+    }
+
     /// Handle TIP or TIP.PGD since TIP.PGD can replace TIP packets if
     /// the destination goes out of ranges.
     #[expect(clippy::redundant_else)]
@@ -347,20 +362,11 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         ip_reconstruction_pattern: IpReconstructionPattern,
         is_pgd: bool,
     ) -> AnalyzerResult<(), H, R> {
-        if let Some(last_bb) = self.last_bb {
-            // There are already some valid TNT packets here since
-            // last_bb is not uninitialized
-            let mut last_bb = last_bb.get();
-            // Clear the pending tnt buffers.
-            let tnt_buffer = self.tnt_buffer_manager.take();
-            let res = self.handle_maybe_full_tnt_buffer(context, &mut last_bb, tnt_buffer);
-            self.last_bb = NonZero::new(last_bb);
-            res?;
-        }
         if matches!(self.pre_tip_status, PreTipStatus::Normal) {
             self.determine_pre_tip_status(context)?;
         }
-        let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) else {
+        let Some(new_last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern)
+        else {
             // Out-of-context IP
             if is_pgd {
                 // SYSCALL into kernel codes...
@@ -371,45 +377,47 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 return Err(AnalyzerError::InvalidPacket);
             }
         };
-        self.last_bb = NonZero::new(last_bb);
         match self.pre_tip_status {
             PreTipStatus::Normal => {
+                self.process_all_pending_tnts(context)?;
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
             PreTipStatus::PendingReturn => {
+                self.process_all_pending_tnts(context)?;
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::Return)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::Return)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectGoto => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectJump)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectJump)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectCall => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::IndirectCall)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectCall)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFarTransfer => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFup => {
                 self.pre_tip_status = PreTipStatus::Normal;
                 self.tnt_buffer_manager.clear();
+                self.last_bb = NonZero::new(new_last_bb);
                 return Ok(());
             }
             PreTipStatus::PendingOvf => {
@@ -417,6 +425,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 return Err(AnalyzerError::InvalidPacket);
             }
         }
+        self.last_bb = NonZero::new(new_last_bb);
 
         Ok(())
     }
