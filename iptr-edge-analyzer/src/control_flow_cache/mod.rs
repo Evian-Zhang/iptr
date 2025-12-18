@@ -34,7 +34,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     /// Note that this function may re-inject tnt buffer into [`tnt_buffer_manager`][Self::tnt_buffer_manager] if
     /// a deferred TIP is detected (in that case, the remaining TNT bits should be processed
     /// AFTER the deferred TIP is processed)
-    #[expect(clippy::cast_possible_truncation)]
     pub(crate) fn handle_maybe_full_tnt_buffer(
         &mut self,
         context: &DecoderContext,
@@ -51,7 +50,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             let tnt_proceed = self.handle_tnt_buffer32(
                 context,
                 last_bb_ref,
-                (remain_buffer_value as u32).to_ne_bytes(),
+                ((remain_buffer_value >> u32::BITS) as u32).to_ne_bytes(),
             )?;
             if let TntProceed::Break {
                 processed_bit_count,
@@ -64,12 +63,15 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 return Ok(());
             }
             remain_bits -= u32::BITS;
-            remain_buffer_value >>= u32::BITS;
+            remain_buffer_value <<= u32::BITS;
             total_processed_bit_count += u32::BITS;
         }
         while remain_bits >= u8::BITS {
-            let (_new_cached_key, tnt_proceed) =
-                self.handle_tnt_buffer8(context, last_bb_ref, remain_buffer_value as u8)?;
+            let (_new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(
+                context,
+                last_bb_ref,
+                (remain_buffer_value >> (u64::BITS - u8::BITS)) as u8,
+            )?;
             if let TntProceed::Break {
                 processed_bit_count,
                 pre_tip_status,
@@ -81,11 +83,12 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 return Ok(());
             }
             remain_bits -= u8::BITS;
-            remain_buffer_value >>= u8::BITS;
+            remain_buffer_value <<= u8::BITS;
             total_processed_bit_count += u8::BITS;
         }
         while remain_bits != 0 {
-            let tnt_bit = (remain_buffer_value & 0b1) != 0;
+            let tnt_bit =
+                (remain_buffer_value & u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b1000_0000])) != 0;
             let (_new_cached_key, tnt_proceed) =
                 self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
@@ -99,7 +102,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 return Ok(());
             }
             remain_bits -= 1;
-            remain_buffer_value >>= 1;
+            remain_buffer_value <<= 1;
             total_processed_bit_count += 1;
         }
 
@@ -115,7 +118,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         tnt_buffer: TntBuffer,
     ) -> AnalyzerResult<(), H, R> {
         let [b0, b1, b2, b3, b4, b5, b6, b7] = tnt_buffer.get_array_qword();
-        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
+        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b4, b5, b6, b7])?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -125,7 +128,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             self.mark_deferred_tip(remain_buf, pre_tip_status)?;
             return Ok(());
         }
-        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b4, b5, b6, b7])?;
+        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -163,7 +166,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         let start_bb = *last_bb_ref;
         let mut cached_keys = [const { MaybeUninit::uninit() }; 4];
         let [b0, b1, b2, b3] = tnt_buffer;
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b0)?;
+        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b3)?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -175,7 +178,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             });
         }
         cached_keys[0].write(new_cached_key);
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b1)?;
+        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b2)?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -187,7 +190,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             });
         }
         cached_keys[1].write(new_cached_key);
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b2)?;
+        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b1)?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -199,7 +202,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             });
         }
         cached_keys[2].write(new_cached_key);
-        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b3)?;
+        let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b0)?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
@@ -270,7 +273,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         let start_bb = *last_bb_ref;
         // The default value does not matter. The for-loop must run at least once
         let mut tnt_proceed = TntProceed::Continue;
-        for bit in 0..8 {
+        for bit in (0..8).rev() {
             let tnt_bit = (tnt_bits & (1 << bit)) != 0;
             let (new_cached_key, this_tnt_proceed) =
                 self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
