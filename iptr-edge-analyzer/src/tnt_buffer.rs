@@ -187,7 +187,8 @@ impl TntBufferManager {
         if self.buf.bits() + buf.bits() > u64::BITS {
             return Err(AnalyzerError::ExceededTntBuffer);
         }
-        self.buf.value |= buf.value.wrapping_shr(self.buf.bits());
+        self.buf.value = self.buf.value.wrapping_shr(buf.bits());
+        self.buf.value |= buf.value;
         self.buf.bits += buf.bits();
 
         Ok(())

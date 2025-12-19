@@ -50,7 +50,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             let tnt_proceed = self.handle_tnt_buffer32(
                 context,
                 last_bb_ref,
-                ((remain_buffer_value >> u32::BITS) as u32).to_ne_bytes(),
+                ((remain_buffer_value >> u32::BITS) as u32).to_le_bytes(),
             )?;
             if let TntProceed::Break {
                 processed_bit_count,

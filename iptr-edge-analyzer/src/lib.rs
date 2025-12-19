@@ -334,6 +334,8 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 }
             }
         }
+        // Update last bb to avoid re-invoke handler callback twice in `process_all_pending_tnts`
+        self.last_bb = NonZero::new(last_bb);
 
         Ok(())
     }

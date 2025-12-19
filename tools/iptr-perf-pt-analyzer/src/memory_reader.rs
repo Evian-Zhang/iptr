@@ -102,12 +102,16 @@ impl ReadMemory for PerfMmapBasedMemoryReader {
         debug_assert!(pos < self.entries.len(), "Unexpected pos out of bounds!");
         let entry = unsafe { self.entries.get_unchecked(pos) };
         let start_offset = address - entry.virtual_address;
+        let read_size = std::cmp::min(size, entry.mmap.len().saturating_sub(start_offset as usize));
+        if read_size == 0 {
+            return Err(PerfMmapBasedMemoryReaderError::NotMmaped(address));
+        }
         let Some(mem) = entry
             .mmap
-            .get((start_offset as usize)..((start_offset as usize).saturating_add(size)))
+            .get((start_offset as usize)..((start_offset as usize).saturating_add(read_size)))
         else {
             return Err(PerfMmapBasedMemoryReaderError::NotMmaped(
-                address.saturating_add(size as u64) - 1,
+                address.saturating_add(read_size as u64) - 1,
             ));
         };
         Ok(callback(mem))
