@@ -42,7 +42,7 @@ impl TntBuffer {
     /// ```
     pub fn remove_first_n_bits(self, n: u32) -> Self {
         let mut this = self;
-        this.value = this.value.wrapping_shl(n);
+        this.value = this.value.unbounded_shl(n);
         this.bits = this.bits.saturating_sub(n);
 
         this
@@ -119,7 +119,7 @@ impl TntBufferManager {
                 value: self.buf.value,
                 bits: u64::BITS,
             };
-            self.buf.value = (short_tnt_packet as u64).wrapping_shl(u64::BITS - remain_count);
+            self.buf.value = (short_tnt_packet as u64).unbounded_shl(u64::BITS - remain_count);
             self.buf.bits = remain_count;
             Some(full_buf)
         }
@@ -171,7 +171,7 @@ impl TntBufferManager {
                 value: self.buf.value,
                 bits: u64::BITS,
             };
-            self.buf.value = long_tnt_packet.wrapping_shl(u64::BITS - remain_count);
+            self.buf.value = long_tnt_packet.unbounded_shl(u64::BITS - remain_count);
             self.buf.bits = remain_count;
             Some(full_buf)
         }
@@ -187,7 +187,7 @@ impl TntBufferManager {
         if self.buf.bits() + buf.bits() > u64::BITS {
             return Err(AnalyzerError::ExceededTntBuffer);
         }
-        self.buf.value = self.buf.value.wrapping_shr(buf.bits());
+        self.buf.value = self.buf.value.unbounded_shr(buf.bits());
         self.buf.value |= buf.value;
         self.buf.bits += buf.bits();
 
