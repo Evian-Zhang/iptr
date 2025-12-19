@@ -266,6 +266,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "iptr-libxdc-experiments-standalone-decoder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "hashbrown",
+ "iptr-decoder",
+ "iptr-edge-analyzer",
+ "memmap2",
+ "thiserror",
+]
+
+[[package]]
 name = "iptr-perf-pt-analyzer"
 version = "0.1.0"
 dependencies = [
