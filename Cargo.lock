@@ -297,6 +297,9 @@ name = "iptr-perf-pt-reader"
 version = "0.1.0"
 dependencies = [
  "derive_more",
+ "iptr-edge-analyzer",
+ "log",
+ "memmap2",
  "thiserror",
 ]
 

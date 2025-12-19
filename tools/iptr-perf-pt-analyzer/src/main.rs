@@ -1,10 +1,10 @@
 mod control_flow_handler;
-mod memory_reader;
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::EdgeAnalyzer;
+use iptr_perf_pt_reader::memory_reader::PerfMmapBasedMemoryReader;
 
 use std::{fs::File, path::PathBuf};
 
@@ -32,7 +32,7 @@ fn main() -> Result<()> {
             .context("Failed to parse perf.data format")?;
 
     let mut control_flow_handler = control_flow_handler::PerfAnalyzerControlFlowHandler::default();
-    let mut memory_reader = memory_reader::PerfMmapBasedMemoryReader::new(&mmap2_headers);
+    let mut memory_reader = PerfMmapBasedMemoryReader::new(&mmap2_headers);
 
     let edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
     #[cfg(feature = "debug")]

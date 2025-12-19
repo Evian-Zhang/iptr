@@ -1,7 +1,7 @@
 use std::{fs::File, path::Path};
 
+use crate::PerfMmap2Header;
 use iptr_edge_analyzer::ReadMemory;
-use iptr_perf_pt_reader::PerfMmap2Header;
 use memmap2::{Mmap, MmapOptions};
 use thiserror::Error;
 
@@ -22,6 +22,7 @@ pub enum PerfMmapBasedMemoryReaderError {
 
 impl PerfMmapBasedMemoryReader {
     #[expect(clippy::cast_possible_truncation)]
+    #[must_use]
     pub fn new(mmap2_headers: &[PerfMmap2Header]) -> Self {
         let mut entries = Vec::with_capacity(mmap2_headers.len());
 
