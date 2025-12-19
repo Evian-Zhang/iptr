@@ -3,10 +3,7 @@ mod memory_reader;
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use iptr_decoder::{
-    DecodeOptions,
-    packet_handler::{combined::CombinedPacketHandler, log::PacketHandlerRawLogger},
-};
+use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::EdgeAnalyzer;
 
 use std::{fs::File, path::PathBuf};
@@ -38,8 +35,13 @@ fn main() -> Result<()> {
     let mut memory_reader = memory_reader::PerfMmapBasedMemoryReader::new(&mmap2_headers);
 
     let edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
-    let mut packet_handler =
-        CombinedPacketHandler::new(PacketHandlerRawLogger::default(), edge_analyzer);
+    #[cfg(feature = "debug")]
+    let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(
+        iptr_decoder::packet_handler::log::PacketHandlerRawLogger::default(),
+        edge_analyzer,
+    );
+    #[cfg(not(feature = "debug"))]
+    let mut packet_handler = edge_analyzer;
 
     for pt_auxtrace in pt_auxtraces {
         if let Err(err) = iptr_decoder::decode(

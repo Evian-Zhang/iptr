@@ -8,8 +8,14 @@ repository = { workspace = true }
 [lints]
 workspace = true
 
+[features]
+default = []
+debug = [
+  "iptr-decoder/log_handler",
+] # Enable debug logging for each low level packets
+
 [dependencies]
-iptr-decoder = { workspace = true, features = ["alloc"] }
+iptr-decoder = { workspace = true }
 iptr-edge-analyzer = { workspace = true }
 iptr-perf-pt-reader = { workspace = true }
 log = { workspace = true }

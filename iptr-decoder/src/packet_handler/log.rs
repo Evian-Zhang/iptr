@@ -1,7 +1,24 @@
+//! Handler for logging each packets
+//!
+//! The handler provided in this module is [`PacketHandlerRawLogger`], it logs every packet details.
+//! This handler is extremely useful if you are debugging your own packet handler. You can use this
+//! handler with [`CombinedPacketHandler`][super::combined::CombinedPacketHandler]:
+//!
+//! ```rust
+//! # use iptr_decoder::packet_handler::{packet_counter::PacketCounter, combined::CombinedPacketHandler, log::PacketHandlerRawLogger};
+//! # let custom_packet_handler = PacketCounter::default();
+//! // let custom_packet_handler = ...
+//! let handler1 = PacketHandlerRawLogger::default();
+//! let handler2 = custom_packet_handler;
+//! let handler = CombinedPacketHandler::new(handler1, handler2);
+//! // Use handler1 ...
+//! ```
+
 use core::convert::Infallible;
 
 use crate::{DecoderContext, HandlePacket, IpReconstructionPattern, PtwPayload};
 
+/// Handler for logging each packets
 #[derive(Default)]
 pub struct PacketHandlerRawLogger {}
 

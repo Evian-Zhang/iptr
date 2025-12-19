@@ -11,7 +11,7 @@ repository = { workspace = true }
 workspace = true
 
 [dependencies]
-iptr-decoder = { workspace = true, features = ["alloc"] }
+iptr-decoder = { workspace = true, features = ["log_handler"] }
 iptr-perf-pt-reader = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
