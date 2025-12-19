@@ -87,8 +87,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             total_processed_bit_count += u8::BITS;
         }
         while remain_bits != 0 {
-            let tnt_bit =
-                (remain_buffer_value & u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b1000_0000])) != 0;
+            let tnt_bit = (remain_buffer_value & (1 << 63)) != 0;
             let (_new_cached_key, tnt_proceed) =
                 self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
@@ -287,12 +286,12 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 return Ok((
                     None,
                     TntProceed::Break {
-                        processed_bit_count: bit,
+                        processed_bit_count: 7 - bit,
                         pre_tip_status,
                     },
                 ));
             }
-            cached_keys[bit as usize].write(new_cached_key);
+            cached_keys[(7 - bit) as usize].write(new_cached_key);
         }
         let mut cached_key = None;
         for new_cached_key in cached_keys {
