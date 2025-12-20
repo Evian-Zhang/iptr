@@ -155,48 +155,137 @@ impl StaticControlFlowAnalyzer {
         match self.cfg.entry(insn_addr) {
             hashbrown::hash_map::Entry::Occupied(entry) => Ok(entry.into_mut()),
             hashbrown::hash_map::Entry::Vacant(entry) => {
-                let mut instruction = Instruction::default();
-                let mut insn_addr = insn_addr;
-                let cfg_terminator = loop {
-                    let (cfg_terminator, next_insn_addr) = memory_reader
-                        .read_memory(insn_addr, 4096, |insn_buf| {
-                            let mut decoder = IcedDecoder::with_ip(
-                                tracee_mode.bitness(),
-                                insn_buf,
-                                insn_addr,
-                                IcedDecoderOptions::NONE,
-                            );
-                            let mut last_next_insn_addr = None;
-                            loop {
-                                if !decoder.can_decode() {
-                                    let Some(next_insn_addr) = last_next_insn_addr else {
-                                        // Even the first instruction cannot be decoded
-                                        return Err(AnalyzerError::InvalidInstruction);
-                                    };
-                                    return Ok((None, next_insn_addr));
-                                }
-                                decoder.decode_out(&mut instruction);
-                                let next_insn_addr = instruction.next_ip();
-                                last_next_insn_addr = Some(next_insn_addr);
-
-                                if let Some(cfg_terminator) = CfgTerminator::try_from(&instruction)
-                                {
-                                    return Ok((Some(cfg_terminator), next_insn_addr));
-                                }
-                            }
-                        })
-                        .map_err(AnalyzerError::MemoryReader)??;
-
-                    if let Some(cfg_terminator) = cfg_terminator {
-                        break cfg_terminator;
-                    }
-                    insn_addr = next_insn_addr;
-                };
-                let node = CfgNode {
-                    terminator: cfg_terminator,
-                };
-                Ok(entry.insert(node))
+                Ok(entry.insert(calculate_terminator(memory_reader, tracee_mode, insn_addr)?))
             }
         }
     }
+}
+
+#[expect(clippy::too_many_lines)]
+fn calculate_terminator<H: HandleControlFlow, R: ReadMemory>(
+    memory_reader: &mut R,
+    tracee_mode: TraceeMode,
+    insn_addr: u64,
+) -> AnalyzerResult<CfgNode, H, R> {
+    let mut instruction = Instruction::default();
+    let mut insn_addr = insn_addr;
+    let mut cross_page_insn_buf = [0u8; 16];
+    let mut cross_page_insn_processed_bytes = None;
+    let cfg_terminator = loop {
+        let (cfg_terminator, next_insn_addr) = memory_reader
+            .read_memory(insn_addr, 4096, |mut insn_buf| {
+                let mut insn_addr = insn_addr;
+                if let Some(processed_bytes) = cross_page_insn_processed_bytes.take() {
+                    // Previously we have a cross-page instruction
+                    let remain_bytes = 16 - processed_bytes;
+                    // remain bytes will never be zero since processed bytes is always less than 16
+                    let Some(remain_buf) = insn_buf.get(0..remain_bytes) else {
+                        // Very unexpected. This means the next page is also missing?
+                        return Err(AnalyzerError::InvalidInstruction);
+                    };
+                    // SAFETY: remain buf has remain_bytes length, and processed_bytes + remain_bytes == 16
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(
+                            remain_buf.as_ptr(),
+                            cross_page_insn_buf.as_mut_ptr().add(processed_bytes),
+                            remain_bytes,
+                        );
+                    }
+                    let mut decoder = IcedDecoder::with_ip(
+                        tracee_mode.bitness(),
+                        &cross_page_insn_buf,
+                        insn_addr - processed_bytes as u64,
+                        IcedDecoderOptions::NONE,
+                    );
+                    if !decoder.can_decode() {
+                        // Unexpected! The instruction length exceeds 16 bytes?
+                        return Err(AnalyzerError::Unexpected);
+                    }
+                    decoder.decode_out(&mut instruction);
+                    if instruction.is_invalid() {
+                        // Even concated cross page instruction, it is still invalid
+                        return Err(AnalyzerError::InvalidInstruction);
+                    }
+                    let next_insn_addr = instruction.next_ip();
+                    if let Some(cfg_terminator) = CfgTerminator::try_from(&instruction) {
+                        cross_page_insn_buf = [0u8; 16];
+                        return Ok((Some(cfg_terminator), next_insn_addr));
+                    }
+
+                    let instr_len = instruction.len();
+                    // If instr len is less than remain bytes, why the previous round does not decode it out?
+                    debug_assert!(instr_len >= processed_bytes, "Unexpected");
+                    let Some(next_insn_buf) = insn_buf.get((instr_len - processed_bytes)..) else {
+                        return Err(AnalyzerError::Unexpected);
+                    };
+                    insn_buf = next_insn_buf;
+                    insn_addr += (instr_len - processed_bytes) as u64;
+                    cross_page_insn_buf = [0u8; 16];
+                }
+
+                let mut decoder = IcedDecoder::with_ip(
+                    tracee_mode.bitness(),
+                    insn_buf,
+                    insn_addr,
+                    IcedDecoderOptions::NONE,
+                );
+                let mut last_next_insn_addr = None;
+                loop {
+                    if !decoder.can_decode() {
+                        let Some(next_insn_addr) = last_next_insn_addr else {
+                            // Even the first instruction cannot be decoded
+                            return Err(AnalyzerError::InvalidInstruction);
+                        };
+                        // Have readed all instructions
+                        return Ok((None, next_insn_addr));
+                    }
+                    let instr_pos = decoder.position();
+                    decoder.decode_out(&mut instruction);
+                    if instruction.is_invalid() {
+                        let processed_bytes = insn_buf.len().saturating_sub(instr_pos);
+                        if processed_bytes >= 16 {
+                            return Err(AnalyzerError::InvalidInstruction);
+                        }
+                        // This instruction may cross page
+                        let next_insn_addr = instruction.ip() + processed_bytes as u64;
+                        // SAFETY: Bounds: saturating sub is always less than or equal to
+                        debug_assert!(
+                            instr_pos + processed_bytes <= insn_buf.len(),
+                            "Unexpected oob read"
+                        );
+                        // SAFETY: Bounds: checked in if-guard
+                        debug_assert!(
+                            processed_bytes <= cross_page_insn_buf.len(),
+                            "Unexpected oob write"
+                        );
+                        unsafe {
+                            std::ptr::copy_nonoverlapping(
+                                insn_buf.as_ptr().add(instr_pos),
+                                cross_page_insn_buf.as_mut_ptr(),
+                                processed_bytes,
+                            );
+                        }
+                        cross_page_insn_processed_bytes = Some(processed_bytes);
+                        return Ok((None, next_insn_addr));
+                    }
+
+                    let next_insn_addr = instruction.next_ip();
+                    last_next_insn_addr = Some(next_insn_addr);
+
+                    if let Some(cfg_terminator) = CfgTerminator::try_from(&instruction) {
+                        return Ok((Some(cfg_terminator), next_insn_addr));
+                    }
+                }
+            })
+            .map_err(AnalyzerError::MemoryReader)??;
+
+        if let Some(cfg_terminator) = cfg_terminator {
+            break cfg_terminator;
+        }
+        insn_addr = next_insn_addr;
+    };
+    let node = CfgNode {
+        terminator: cfg_terminator,
+    };
+    Ok(node)
 }
