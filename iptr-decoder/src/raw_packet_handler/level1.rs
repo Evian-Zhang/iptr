@@ -66,6 +66,7 @@ impl<H: HandlePacket> RawPacketHandlers<H> {
     };
 }
 
+#[inline]
 fn handle_pad_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -92,6 +93,7 @@ fn handle_pad_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_short_tnt_packet<H: HandlePacket>(
     _buf: &[u8],
     byte: u8,
@@ -115,6 +117,7 @@ fn handle_short_tnt_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_tip_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -134,6 +137,7 @@ fn handle_tip_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_tip_pgd_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -153,6 +157,7 @@ fn handle_tip_pgd_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_tip_pge_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -172,6 +177,7 @@ fn handle_tip_pge_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_fup_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -309,6 +315,7 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
     Ok(pattern)
 }
 
+#[inline]
 fn handle_cyc_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -340,6 +347,7 @@ fn handle_cyc_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_tsc_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -366,6 +374,7 @@ fn handle_tsc_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_mtc_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -388,6 +397,7 @@ fn handle_mtc_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_mode_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -422,6 +432,7 @@ fn handle_mode_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_wrong_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -431,6 +442,7 @@ fn handle_wrong_packet<H: HandlePacket>(
     Err(DecoderError::InvalidPacket)
 }
 
+#[inline]
 fn handle_level2_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,

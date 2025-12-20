@@ -7,6 +7,7 @@ use crate::{
     error::{DecoderError, DecoderResult},
 };
 
+#[inline]
 fn handle_cbr_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -27,6 +28,7 @@ fn handle_cbr_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_pip_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -57,6 +59,7 @@ fn handle_pip_packet<H: HandlePacket>(
 #[expect(clippy::unreadable_literal)]
 const PSB: u128 = 0x82028202820282028202820282028202;
 
+#[inline]
 fn handle_psb_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -85,6 +88,7 @@ fn handle_psb_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_psbend_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -102,6 +106,7 @@ fn handle_psbend_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_trace_stop_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -119,6 +124,7 @@ fn handle_trace_stop_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_long_tnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -153,6 +159,7 @@ fn handle_long_tnt_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_vmcs_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -178,6 +185,7 @@ fn handle_vmcs_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_ovf_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -195,6 +203,7 @@ fn handle_ovf_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_mnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -237,6 +246,7 @@ fn handle_mnt_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_tma_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -274,6 +284,7 @@ pub enum PtwPayload {
     EightBytes(u64),
 }
 
+#[inline]
 fn handle_ptw_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -330,6 +341,7 @@ fn handle_ptw_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_exstop_packet<H: HandlePacket>(
     _buf: &[u8],
     byte: u8,
@@ -349,6 +361,7 @@ fn handle_exstop_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_mwait_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -374,6 +387,7 @@ fn handle_mwait_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_pwre_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -403,6 +417,7 @@ fn handle_pwre_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_pwrx_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -432,6 +447,7 @@ fn handle_pwrx_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_bbp_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -441,6 +457,7 @@ fn handle_bbp_packet<H: HandlePacket>(
     Err(DecoderError::Unimplemented)
 }
 
+#[inline]
 fn handle_bep_packet<H: HandlePacket>(
     _buf: &[u8],
     _byte: u8,
@@ -450,6 +467,7 @@ fn handle_bep_packet<H: HandlePacket>(
     Err(DecoderError::Unimplemented)
 }
 
+#[inline]
 fn handle_cfe_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -473,6 +491,7 @@ fn handle_cfe_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 fn handle_evd_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,
@@ -511,6 +530,7 @@ fn handle_evd_packet<H: HandlePacket>(
     Ok(())
 }
 
+#[inline]
 pub fn decode<H: HandlePacket>(
     buf: &[u8],
     context: &mut DecoderContext,
