@@ -183,6 +183,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             use static_analyzer::CfgTerminator::*;
             match terminator {
                 Branch { r#true, r#false } => {
+                    let r#false = r#false as u64 | (r#true & 0xFFFF_FFFF_0000_0000);
                     last_bb = if is_taken { r#true } else { r#false };
                     let new_cached_key = self
                         .handler
@@ -209,10 +210,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     )?;
                     continue 'cfg_traverse;
                 }
-                DirectCall {
-                    target,
-                    return_address: _,
-                } => {
+                DirectCall { target } => {
                     last_bb = target;
                     let new_cached_key = self
                         .handler
@@ -303,10 +301,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
-                DirectCall {
-                    target,
-                    return_address: _,
-                } => {
+                DirectCall { target } => {
                     last_bb = target;
                     let _new_cached_key = self
                         .handler

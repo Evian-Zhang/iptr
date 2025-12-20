@@ -23,8 +23,10 @@ pub enum CfgTerminator {
     Branch {
         /// Address of Taken branch
         r#true: u64,
-        /// Address of Not Taken branch
-        r#false: u64,
+        /// Low 32bits of address of Not Taken branch
+        ///
+        /// A branch cannot be inconsistent in high 32 bits
+        r#false: u32,
     },
     /// A direct JMP
     DirectGoto {
@@ -35,9 +37,6 @@ pub enum CfgTerminator {
     DirectCall {
         /// Address of call target
         target: u64,
-        /// Used for return compression, but currently this is not supported
-        #[expect(unused)]
-        return_address: u64,
     },
     /// An indirect JMP
     IndirectGoto,
@@ -57,13 +56,19 @@ impl CfgTerminator {
     /// Convert an [`Instruction`] to a [`CfgTerminator`].
     ///
     /// Return [`None`] if this instruction does not change control flow.
+    #[expect(clippy::cast_possible_truncation)]
     fn try_from(instruction: &Instruction) -> Option<Self> {
         let next_insn_addr = instruction.next_ip();
 
         if instruction.is_jcc_short_or_near() || instruction.is_loop() || instruction.is_loopcc() {
             // TODO: check whether LOOP/LOOPcc instruction can also be done this way
             let true_target = instruction.near_branch_target();
-            let false_target = next_insn_addr;
+            let false_target = next_insn_addr as u32;
+            debug_assert_eq!(
+                true_target & 0xFFFF_FFFF_0000_0000,
+                next_insn_addr & 0xFFFF_FFFF_0000_0000,
+                "Two branch upper 32 bits mismatch!"
+            );
             Some(CfgTerminator::Branch {
                 r#true: true_target,
                 r#false: false_target,
@@ -77,10 +82,7 @@ impl CfgTerminator {
             Some(CfgTerminator::DirectGoto { target })
         } else if instruction.is_call_near() {
             let target = instruction.near_branch_target();
-            Some(CfgTerminator::DirectCall {
-                target,
-                return_address: next_insn_addr,
-            })
+            Some(CfgTerminator::DirectCall { target })
         } else {
             match instruction.code() {
                 | Code::Retnd | Code::Retnd_imm16
@@ -125,7 +127,7 @@ pub struct StaticControlFlowAnalyzer {
 ///
 /// The CFG map could grow dramatically, so we can initialize with a relative-large
 /// capacity.
-const CFG_MAP_INITIAL_CAPACITY: usize = 0x10000;
+const CFG_MAP_INITIAL_CAPACITY: usize = 0x1000;
 
 impl StaticControlFlowAnalyzer {
     /// Create a new [`StaticControlFlowAnalyzer`]
