@@ -30,13 +30,20 @@ fn main() -> Result<()> {
     let mut memory_reader =
         MemoryReader::new(&page_dump, &page_addr).context("Failed to create memory reader")?;
     let mut control_flow_handler = FuzzBitmapControlFlowHandler::default();
-    let mut edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
+    let edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
+    #[cfg(feature = "debug")]
+    let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(
+        iptr_decoder::packet_handler::log::PacketHandlerRawLogger::default(),
+        edge_analyzer,
+    );
+    #[cfg(not(feature = "debug"))]
+    let mut packet_handler = edge_analyzer;
 
     let file = File::open(input).context("Failed to open input file")?;
     // SAFETY: check the safety requirements of memmap2 documentation
     let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
 
-    iptr_decoder::decode(&buf, DecodeOptions::default(), &mut edge_analyzer).unwrap();
+    iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
 
     Ok(())
 }
