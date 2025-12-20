@@ -16,8 +16,8 @@ pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {
     #[error("Memory reader error")]
     MemoryReader(#[source] R::Error),
     /// Instructions non-decodable by iced-x86
-    #[error("Invalid instruction: {}", .0.iter().map(|x| format!("{x:02x}")).collect::<Vec<_>>().join(" "))]
-    InvalidInstruction(Box<[u8]>),
+    #[error("Invalid instruction")]
+    InvalidInstruction,
     /// Corrupted callstack, will affect the behavior
     /// of return compression
     #[error("The self-maintained callstack is corrupted")]

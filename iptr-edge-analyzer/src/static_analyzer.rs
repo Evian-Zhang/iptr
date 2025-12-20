@@ -157,22 +157,31 @@ impl StaticControlFlowAnalyzer {
                 let mut insn_addr = insn_addr;
                 let cfg_terminator = loop {
                     let (cfg_terminator, next_insn_addr) = memory_reader
-                        .read_memory(insn_addr, 16, |insn_buf| {
+                        .read_memory(insn_addr, 4096, |insn_buf| {
                             let mut decoder = IcedDecoder::with_ip(
                                 tracee_mode.bitness(),
                                 insn_buf,
                                 insn_addr,
                                 IcedDecoderOptions::NONE,
                             );
-                            if !decoder.can_decode() {
-                                return Err(AnalyzerError::InvalidInstruction(insn_buf.into()));
+                            let mut last_next_insn_addr = None;
+                            loop {
+                                if !decoder.can_decode() {
+                                    let Some(next_insn_addr) = last_next_insn_addr else {
+                                        // Even the first instruction cannot be decoded
+                                        return Err(AnalyzerError::InvalidInstruction);
+                                    };
+                                    return Ok((None, next_insn_addr));
+                                }
+                                decoder.decode_out(&mut instruction);
+                                let next_insn_addr = instruction.next_ip();
+                                last_next_insn_addr = Some(next_insn_addr);
+
+                                if let Some(cfg_terminator) = CfgTerminator::try_from(&instruction)
+                                {
+                                    return Ok((Some(cfg_terminator), next_insn_addr));
+                                }
                             }
-                            decoder.decode_out(&mut instruction);
-                            let next_insn_addr = instruction.next_ip();
-
-                            let cfg_terminator = CfgTerminator::try_from(&instruction);
-
-                            Ok((cfg_terminator, next_insn_addr))
                         })
                         .map_err(AnalyzerError::MemoryReader)??;
 
