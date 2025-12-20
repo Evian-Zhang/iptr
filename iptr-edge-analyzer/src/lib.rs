@@ -359,14 +359,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         ip_reconstruction_pattern: IpReconstructionPattern,
         is_pgd: bool,
     ) -> AnalyzerResult<(), H, R> {
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
-            self.determine_pre_tip_status(context)?;
-        }
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
-            // This will also refresh pre_tip_status, which
-            // can avoid non-deferred TIPs
-            self.process_all_pending_tnts(context)?;
-        }
         let Some(new_last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern)
         else {
             // Out-of-context IP
@@ -379,6 +371,16 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                 return Err(AnalyzerError::InvalidPacket);
             }
         };
+        // If pgd goes out of context, we cannot determin pre tip status since the
+        // memory reader may also miss page
+        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+            self.determine_pre_tip_status(context)?;
+        }
+        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+            // This will also refresh pre_tip_status, which
+            // can avoid non-deferred TIPs
+            self.process_all_pending_tnts(context)?;
+        }
         self.last_bb = NonZero::new(new_last_bb);
         match self.pre_tip_status {
             PreTipStatus::Normal => {

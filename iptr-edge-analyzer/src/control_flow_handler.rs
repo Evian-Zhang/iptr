@@ -1,4 +1,5 @@
 /// Kind of control flow transitions
+#[derive(Debug)]
 pub enum ControlFlowTransitionKind {
     /// Conditional Jcc
     ConditionalBranch,

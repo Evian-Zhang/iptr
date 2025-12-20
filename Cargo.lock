@@ -271,9 +271,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "env_logger",
  "hashbrown",
  "iptr-decoder",
  "iptr-edge-analyzer",
+ "log",
  "memmap2",
  "thiserror",
 ]

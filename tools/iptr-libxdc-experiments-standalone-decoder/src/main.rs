@@ -21,6 +21,8 @@ struct Cmdline {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let Cmdline {
         input,
         page_dump,
