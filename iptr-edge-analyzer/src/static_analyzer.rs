@@ -138,6 +138,11 @@ impl StaticControlFlowAnalyzer {
         }
     }
 
+    /// Get the size of CFG nodes
+    pub fn cfg_size(&self) -> usize {
+        self.cfg.len()
+    }
+
     /// Resolve the given `insn_addr` to a [`CfgNode`].
     ///
     /// The `insn_addr` should be the start address of a basic block, and

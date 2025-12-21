@@ -6,7 +6,7 @@ use std::{fs::File, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
-use iptr_edge_analyzer::EdgeAnalyzer;
+use iptr_edge_analyzer::{EdgeAnalyzer, diagnose::DiagnosticInformation};
 
 use crate::{control_flow_handler::FuzzBitmapControlFlowHandler, memory_reader::MemoryReader};
 
@@ -46,6 +46,20 @@ fn main() -> Result<()> {
     let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
 
     iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+
+    #[cfg(feature = "debug")]
+    let (_, edge_analyzer) = packet_handler.into_inner();
+    #[cfg(not(feature = "debug"))]
+    let edge_analyzer = packet_handler;
+
+    let DiagnosticInformation {
+        cfg_size,
+        cache8_size,
+        cache32_size,
+    } = edge_analyzer.diagnose();
+    log::info!(
+        "After analyzer, CFG size {cfg_size}, 8bit cache size {cache8_size}, 32bit cache size {cache32_size}"
+    );
 
     Ok(())
 }

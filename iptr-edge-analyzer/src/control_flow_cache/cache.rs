@@ -62,6 +62,11 @@ impl<D> ControlFlowCacheManager<D> {
         Self::default()
     }
 
+    /// Get the size of 8bit cache and 32bit cache, respectively
+    pub fn cache_size(&self) -> (usize, usize) {
+        (self.cache8.len(), self.cache32.len())
+    }
+
     /// Get cached information for 8 bits TNTs
     pub fn get_byte(&self, start_bb: u64, byte: u8) -> Option<&CachableInformation<D>> {
         self.cache8.get(&ControlFlowSequence8 {

@@ -34,6 +34,11 @@ where
     pub fn new(handler1: H1, handler2: H2) -> Self {
         Self { handler1, handler2 }
     }
+
+    /// Consume the handler and get the original two handler
+    pub fn into_inner(self) -> (H1, H2) {
+        (self.handler1, self.handler2)
+    }
 }
 
 /// Error for [`CombinedPacketHandler`]
