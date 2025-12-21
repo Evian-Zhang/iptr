@@ -3,7 +3,8 @@ resolver = "3"
 members = [
   "iptr-decoder",
   "iptr-edge-analyzer",
-  "iptr-perf-pt-reader", "tools/iptr-libxdc-experiments-standalone-decoder",
+  "iptr-perf-pt-reader",
+  "tools/iptr-libxdc-experiments-standalone-decoder",
   "tools/iptr-perf-pt-analyzer",
   "tools/iptr-perf-pt-extractor",
   "tools/iptr-raw-logger",

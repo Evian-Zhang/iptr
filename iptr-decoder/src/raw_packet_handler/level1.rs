@@ -224,7 +224,6 @@ pub enum IpReconstructionPattern {
 /// # SAFETY
 ///
 /// `ip_bytes` should be no greater than 0b111
-#[expect(clippy::manual_range_patterns)]
 unsafe fn ip_reconstruction<H: HandlePacket>(
     buf: &[u8],
     ip_bytes: u8,
@@ -260,7 +259,7 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
 
             IpReconstructionPattern::FourBytesWithLastIp(ip_payload)
         }
-        0b011 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+        0b011 => {
             let Some([byte1, byte2, byte3, byte4, byte5, byte6]) = buf
                 .get(context.pos..)
                 .and_then(|buf| buf.first_chunk::<6>())
@@ -274,7 +273,7 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
 
             IpReconstructionPattern::SixBytesExtended(ip_payload)
         }
-        0b100 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+        0b100 => {
             let Some([byte1, byte2, byte3, byte4, byte5, byte6]) = buf
                 .get(context.pos..)
                 .and_then(|buf| buf.first_chunk::<6>())
@@ -288,7 +287,7 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
 
             IpReconstructionPattern::SixBytesWithLastIp(ip_payload)
         }
-        0b110 if matches!(context.tracee_mode, TraceeMode::Mode64) => {
+        0b110 => {
             let Some(bytes) = buf
                 .get(context.pos..)
                 .and_then(|buf| buf.first_chunk::<8>())
@@ -301,7 +300,7 @@ unsafe fn ip_reconstruction<H: HandlePacket>(
 
             IpReconstructionPattern::EightBytes(ip_payload)
         }
-        0b011 | 0b100 | 0b101 | 0b110 | 0b111 => {
+        0b101 | 0b111 => {
             return Err(DecoderError::InvalidPacket);
         }
         _ => {

@@ -113,7 +113,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         leaf_id: u8,
         mode: u8,
     ) -> Result<(), Self::Error> {
-        log::trace!("[MODE packet]\tLeaf ID: {leaf_id:#010b}\tmode:{mode:#010b}");
+        log::trace!("[MODE packet]\tLeaf ID: {leaf_id:#05b}\tmode:{mode:#07b}");
         Ok(())
     }
 
