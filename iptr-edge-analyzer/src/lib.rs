@@ -388,14 +388,22 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             }
         };
         // If pgd goes out of context, we cannot determin pre tip status since the
-        // memory reader may also miss page
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
-            self.determine_pre_tip_status(context)?;
-        }
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+        // memory reader may also miss page. So we should put the ip reconstruction first.
+
+        // For FUP, it flushes the CPU's internal TNT buffer, and thus we should process all
+        // pending TNTs, otherwise they would just be lost.
+        if matches!(
+            self.pre_tip_status,
+            PreTipStatus::Normal | PreTipStatus::PendingFup
+        ) {
             // This will also refresh pre_tip_status, which
             // can avoid non-deferred TIPs
             self.process_all_pending_tnts(context)?;
+        }
+        // We should determine pre tip status AFTER processing all pending TNTs, since
+        // the pre tip status is determined by the last valid TNT bit.
+        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
+            self.determine_pre_tip_status(context)?;
         }
         self.last_bb = NonZero::new(new_last_bb);
         match self.pre_tip_status {
