@@ -1,7 +1,9 @@
 //! This module contains static control flow analyzer
 
 use hashbrown::HashMap;
-use iced_x86::{Code, Decoder as IcedDecoder, DecoderOptions as IcedDecoderOptions, Instruction};
+use iced_x86::{
+    Code, Decoder as IcedDecoder, DecoderOptions as IcedDecoderOptions, FlowControl, Instruction,
+};
 use iptr_decoder::TraceeMode;
 
 use crate::{
@@ -83,34 +85,22 @@ impl CfgTerminator {
         } else if instruction.is_call_near() {
             let target = instruction.near_branch_target();
             Some(CfgTerminator::DirectCall { target })
+        } else if matches!(
+            instruction.code(),
+            Code::Retnd
+                | Code::Retnd_imm16
+                | Code::Retnq
+                | Code::Retnq_imm16
+                | Code::Retnw
+                | Code::Retnw_imm16
+        ) {
+            Some(CfgTerminator::NearRet)
+        } else if !matches!(instruction.flow_control(), FlowControl::Next) {
+            Some(CfgTerminator::FarTransfers {
+                next_instruction: next_insn_addr,
+            })
         } else {
-            match instruction.code() {
-                | Code::Retnd | Code::Retnd_imm16
-                | Code::Retnq | Code::Retnq_imm16
-                | Code::Retnw | Code::Retnw_imm16 => Some(CfgTerminator::NearRet),
-                // Far CALL
-                | Code::Call_m1616 | Code::Call_m1632 | Code::Call_m1664
-                | Code::Call_ptr1616 | Code::Call_ptr1632
-                // Far JMP
-                | Code::Jmp_m1616 | Code::Jmp_m1632 | Code::Jmp_m1664
-                | Code::Jmp_ptr1616 | Code::Jmp_ptr1632
-                // Far RET
-                | Code::Retfd | Code::Retfd_imm16
-                | Code::Retfq | Code::Retfq_imm16
-                | Code::Retfw | Code::Retfw_imm16
-                // Iret
-                | Code::Iretd | Code::Iretq | Code::Iretw
-                // Others
-                | Code::Into | Code::Int1 | Code::Int3 | Code::Int_imm8
-                | Code::Syscall | Code::Sysenter
-                | Code::Sysexitd | Code::Sysexitq
-                | Code::Sysretd | Code::Sysretq
-                | Code::Vmlaunch | Code::Vmresume
-                | Code::Ud0 | Code::Ud0_r16_rm16 | Code::Ud0_r32_rm32 | Code::Ud0_r64_rm64
-                | Code::Ud1_r16_rm16 | Code::Ud1_r32_rm32 | Code::Ud1_r64_rm64
-                | Code::Ud2 => Some(CfgTerminator::FarTransfers { next_instruction: next_insn_addr }),
-                _ => None,
-            }
+            None
         }
     }
 }
