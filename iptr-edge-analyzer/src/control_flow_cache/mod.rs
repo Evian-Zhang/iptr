@@ -1,15 +1,18 @@
 //! Caches for control flow in TNT bits and TIP packets.
 
+#[cfg(feature = "cache")]
 mod cache;
 use std::mem::MaybeUninit;
 
+#[cfg(feature = "cache")]
 pub use cache::ControlFlowCacheManager;
 
 use iptr_decoder::DecoderContext;
 
+#[cfg(feature = "cache")]
+use self::cache::CachableInformation;
 use crate::{
     EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed,
-    control_flow_cache::cache::CachableInformation,
     error::{AnalyzerError, AnalyzerResult},
     tnt_buffer::TntBuffer,
 };
@@ -152,6 +155,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         last_bb_ref: &mut u64,
         tnt_buffer: [u8; 4],
     ) -> AnalyzerResult<TntProceed, H, R> {
+        #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_dword(*last_bb_ref, tnt_buffer) {
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
@@ -214,22 +218,30 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         }
         cached_keys[3].write(new_cached_key);
 
-        let mut cached_key = None;
-        for new_cached_key in cached_keys {
-            // SAFETY: All cached keys are written
-            update_cached_key(self.handler, &mut cached_key, unsafe {
-                new_cached_key.assume_init()
-            })?;
+        #[cfg(feature = "cache")]
+        {
+            let mut cached_key = None;
+            for new_cached_key in cached_keys {
+                // SAFETY: All cached keys are written
+                update_cached_key(self.handler, &mut cached_key, unsafe {
+                    new_cached_key.assume_init()
+                })?;
+            }
+            // The cache will only be inserted if `TntProceed` is always `Continue`
+            self.cache_manager.insert_dword(
+                start_bb,
+                tnt_buffer,
+                CachableInformation {
+                    user_data: cached_key,
+                    new_bb: *last_bb_ref,
+                },
+            );
         }
-        // The cache will only be inserted if `TntProceed` is always `Continue`
-        self.cache_manager.insert_dword(
-            start_bb,
-            tnt_buffer,
-            CachableInformation {
-                user_data: cached_key,
-                new_bb: *last_bb_ref,
-            },
-        );
+        #[cfg(not(feature = "cache"))]
+        {
+            let _ = start_bb;
+            let _ = cached_keys;
+        }
 
         Ok(tnt_proceed)
     }
@@ -256,6 +268,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         last_bb_ref: &mut u64,
         tnt_bits: u8,
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
+        #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_byte(*last_bb_ref, tnt_bits) {
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
@@ -293,26 +306,36 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             }
             cached_keys[(7 - bit) as usize].write(new_cached_key);
         }
-        let mut cached_key = None;
-        for new_cached_key in cached_keys {
-            // SAFETY: All elements are written
-            let new_cached_key = unsafe { new_cached_key.assume_init() };
-            update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+        #[cfg(feature = "cache")]
+        {
+            let mut cached_key = None;
+            for new_cached_key in cached_keys {
+                // SAFETY: All elements are written
+                let new_cached_key = unsafe { new_cached_key.assume_init() };
+                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+            }
+            // The cache will only be inserted if `TntProceed` is always `Continue`
+            self.cache_manager.insert_byte(
+                start_bb,
+                tnt_bits,
+                CachableInformation {
+                    user_data: cached_key.clone(),
+                    new_bb: *last_bb_ref,
+                },
+            );
+            Ok((cached_key, tnt_proceed))
         }
-        // The cache will only be inserted if `TntProceed` is always `Continue`
-        self.cache_manager.insert_byte(
-            start_bb,
-            tnt_bits,
-            CachableInformation {
-                user_data: cached_key.clone(),
-                new_bb: *last_bb_ref,
-            },
-        );
-        Ok((cached_key, tnt_proceed))
+        #[cfg(not(feature = "cache"))]
+        {
+            let _ = start_bb;
+            let _ = cached_keys;
+            Ok((None, tnt_proceed))
+        }
     }
 }
 
 /// A convenient wrapper for [`merge_cached_keys`][HandleControlFlow::merge_cached_keys]
+#[cfg(feature = "cache")]
 pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
     handler: &mut H,
     cached_key: &mut Option<H::CachedKey>,

@@ -10,15 +10,16 @@ use std::num::NonZero;
 
 use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
-use crate::{
-    control_flow_cache::ControlFlowCacheManager,
-    error::{AnalyzerError, AnalyzerResult},
-    static_analyzer::StaticControlFlowAnalyzer,
-    tnt_buffer::TntBufferManager,
-};
+#[cfg(feature = "cache")]
+use crate::control_flow_cache::ControlFlowCacheManager;
 pub use crate::{
     control_flow_handler::{ControlFlowTransitionKind, HandleControlFlow},
     memory_reader::ReadMemory,
+};
+use crate::{
+    error::{AnalyzerError, AnalyzerResult},
+    static_analyzer::StaticControlFlowAnalyzer,
+    tnt_buffer::TntBufferManager,
 };
 
 /// TNT bits processing status
@@ -96,6 +97,7 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     /// Buffering the TNT bits for better cache.
     tnt_buffer_manager: TntBufferManager,
     /// Caches used to speed up TNT bits resolution without querying the CFG.
+    #[cfg(feature = "cache")]
     cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
     /// CFG node maintainer
     static_analyzer: StaticControlFlowAnalyzer,
@@ -114,6 +116,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             last_bb: None,
             pre_tip_status: PreTipStatus::Normal,
             tnt_buffer_manager: TntBufferManager::new(),
+            #[cfg(feature = "cache")]
             cache_manager: ControlFlowCacheManager::new(),
             static_analyzer: StaticControlFlowAnalyzer::new(),
             handler,
@@ -174,7 +177,10 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         is_taken: bool,
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
         let mut last_bb = *last_bb_ref;
+        #[cfg(feature = "cache")]
         let mut cached_key = None;
+        #[cfg(not(feature = "cache"))]
+        let cached_key = None;
         let tnt_proceed;
         'cfg_traverse: loop {
             let cfg_node =
@@ -190,11 +196,14 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    #[cfg(feature = "cache")]
                     control_flow_cache::update_cached_key(
                         self.handler,
                         &mut cached_key,
                         new_cached_key,
                     )?;
+                    #[cfg(not(feature = "cache"))]
+                    let _ = new_cached_key;
                     tnt_proceed = TntProceed::Continue;
                     break 'cfg_traverse;
                 }
@@ -204,11 +213,14 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    #[cfg(feature = "cache")]
                     control_flow_cache::update_cached_key(
                         self.handler,
                         &mut cached_key,
                         new_cached_key,
                     )?;
+                    #[cfg(not(feature = "cache"))]
+                    let _ = new_cached_key;
                     continue 'cfg_traverse;
                 }
                 DirectCall { target } => {
@@ -217,11 +229,14 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         .handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
+                    #[cfg(feature = "cache")]
                     control_flow_cache::update_cached_key(
                         self.handler,
                         &mut cached_key,
                         new_cached_key,
                     )?;
+                    #[cfg(not(feature = "cache"))]
+                    let _ = new_cached_key;
                     continue 'cfg_traverse;
                 }
                 IndirectGoto => {
