@@ -50,6 +50,10 @@ pub enum MemoryReaderError {
 impl ReadMemory for MemoryReader {
     type Error = MemoryReaderError;
 
+    fn at_decode_begin(&mut self) -> std::result::Result<(), Self::Error> {
+        Ok(())
+    }
+
     #[expect(clippy::cast_possible_truncation)]
     fn read_memory<T>(
         &mut self,

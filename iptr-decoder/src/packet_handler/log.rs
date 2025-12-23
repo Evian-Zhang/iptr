@@ -26,6 +26,11 @@ impl HandlePacket for PacketHandlerRawLogger {
     // This logger will never error
     type Error = Infallible;
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        log::trace!("Decode begin!");
+        Ok(())
+    }
+
     fn on_short_tnt_packet(
         &mut self,
         _context: &DecoderContext,

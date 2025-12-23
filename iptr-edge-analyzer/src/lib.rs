@@ -480,6 +480,27 @@ where
 {
     type Error = AnalyzerError<H, R>;
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        self.last_ip = 0;
+        self.last_bb = None;
+        self.pre_tip_status = PreTipStatus::Normal;
+        self.tnt_buffer_manager.clear();
+        self.handler
+            .at_decode_begin()
+            .map_err(AnalyzerError::ControlFlowHandler)?;
+        self.reader
+            .at_decode_begin()
+            .map_err(AnalyzerError::MemoryReader)?;
+        #[cfg(feature = "cache")]
+        {
+            self.cache_32bit_hit_count = 0;
+            self.cache_8bit_hit_count = 0;
+            self.cache_missed_bit_count = 0;
+        }
+
+        Ok(())
+    }
+
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,

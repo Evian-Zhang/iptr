@@ -19,6 +19,12 @@ pub trait HandlePacket {
     /// Custom error type
     type Error: core::error::Error;
 
+    /// Callback at begin of decoding.
+    ///
+    /// This is useful when using the same handler to process multiple Intel PT
+    /// traces
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error>;
+
     /// Handle short TNT packet
     ///
     /// `packet_byte` is the whole byte of short TNT packet. `highest_bit`

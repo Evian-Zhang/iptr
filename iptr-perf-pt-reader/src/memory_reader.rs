@@ -80,6 +80,10 @@ impl PerfMmapBasedMemoryReader {
 impl ReadMemory for PerfMmapBasedMemoryReader {
     type Error = PerfMmapBasedMemoryReaderError;
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     #[expect(clippy::cast_possible_truncation)]
     fn read_memory<T>(
         &mut self,

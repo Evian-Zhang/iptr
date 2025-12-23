@@ -65,6 +65,16 @@ where
 {
     type Error = CombinedError<H1, H2>;
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        self.handler1
+            .at_decode_begin()
+            .map_err(CombinedError::H1Error)?;
+        self.handler2
+            .at_decode_begin()
+            .map_err(CombinedError::H2Error)?;
+        Ok(())
+    }
+
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,

@@ -33,6 +33,12 @@ pub trait HandleControlFlow {
     /// of re-parsing all TNT bits.
     type CachedKey: Clone;
 
+    /// Callback at begin of decoding.
+    ///
+    /// This is useful when using the same handler to process multiple Intel PT
+    /// traces
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error>;
+
     /// Callback when a new basic block is met.
     ///
     /// If the new block is not important, you can return [`None`] for cached key.

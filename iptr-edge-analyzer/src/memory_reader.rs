@@ -3,6 +3,12 @@ pub trait ReadMemory {
     /// Error for memory reading
     type Error: std::error::Error;
 
+    /// Callback at begin of decoding.
+    ///
+    /// This is useful when using the same handler to process multiple Intel PT
+    /// traces
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error>;
+
     /// Read memories at given address with given size, and
     /// invoke the given callback with the read memories.
     ///

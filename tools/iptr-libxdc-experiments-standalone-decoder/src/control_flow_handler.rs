@@ -7,6 +7,10 @@ impl HandleControlFlow for FuzzBitmapControlFlowHandler {
     type Error = std::convert::Infallible;
     type CachedKey = ();
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn on_new_block(
         &mut self,
         _block_addr: u64,

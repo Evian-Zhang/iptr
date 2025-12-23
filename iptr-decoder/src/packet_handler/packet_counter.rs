@@ -26,6 +26,11 @@ impl HandlePacket for PacketCounter {
     // Will never fail
     type Error = core::convert::Infallible;
 
+    fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
+        self.packet_count = 0;
+        Ok(())
+    }
+
     fn on_short_tnt_packet(
         &mut self,
         _context: &DecoderContext,
