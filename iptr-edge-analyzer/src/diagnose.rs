@@ -28,7 +28,7 @@ pub struct DiagnosticInformation {
 
 impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     /// Get diagnostic information
-    #[allow(clippy::cast_precision_loss)]
+    #[cfg_attr(feature = "cache", expect(clippy::cast_precision_loss))]
     #[must_use]
     pub fn diagnose(&self) -> DiagnosticInformation {
         let cfg_size = self.static_analyzer.cfg_size();

@@ -139,7 +139,7 @@ fn read_perf_file_section(perf_data: &[u8], pos: &mut usize) -> Option<(u64, u64
     Some((offset, size))
 }
 
-#[allow(unused)]
+#[expect(unused)]
 struct PerfEventHeader {
     r#type: u32,
     misc: u16,

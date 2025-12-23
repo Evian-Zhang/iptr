@@ -32,7 +32,7 @@ pub trait HandlePacket {
     /// guaranteed to be in range 0..=6
     ///
     /// If `highest_bit` is 0, this means there is no Taken/Not-taken bits.
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,
@@ -50,7 +50,7 @@ pub trait HandlePacket {
     /// Taken/Not-taken bit, guaranteed to be in range 0..=46 or [`u32::MAX`]
     ///
     /// If `highest_bit` is [`u32::MAX`], this means there is no Taken/Not-taken bits.
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_long_tnt_packet(
         &mut self,
         context: &DecoderContext,
@@ -61,7 +61,7 @@ pub trait HandlePacket {
     }
 
     /// Handle TIP packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_tip_packet(
         &mut self,
         context: &DecoderContext,
@@ -71,7 +71,7 @@ pub trait HandlePacket {
     }
 
     /// Handle TIP.PGD packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_tip_pgd_packet(
         &mut self,
         context: &DecoderContext,
@@ -81,7 +81,7 @@ pub trait HandlePacket {
     }
 
     /// Handle TIP.PGE packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_tip_pge_packet(
         &mut self,
         context: &DecoderContext,
@@ -91,7 +91,7 @@ pub trait HandlePacket {
     }
 
     /// Handle FUP packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_fup_packet(
         &mut self,
         context: &DecoderContext,
@@ -101,7 +101,7 @@ pub trait HandlePacket {
     }
 
     /// Handle PAD packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_pad_packet(&mut self, context: &DecoderContext) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -109,7 +109,7 @@ pub trait HandlePacket {
     /// Handle CYC packet
     ///
     /// `cyc_packet` is the total content of the CYC packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_cyc_packet(
         &mut self,
         context: &DecoderContext,
@@ -121,7 +121,7 @@ pub trait HandlePacket {
     /// Handle MODE packet
     ///
     /// `leaf_id` and `mode` is the leaf ID and mode of MODE packet.
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_mode_packet(
         &mut self,
         context: &DecoderContext,
@@ -134,7 +134,7 @@ pub trait HandlePacket {
     /// Handle MTC packet
     ///
     /// `ctc_payload` is the 8-bit CTC payload value
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_mtc_packet(
         &mut self,
         context: &DecoderContext,
@@ -146,7 +146,7 @@ pub trait HandlePacket {
     /// Handle TSC packet
     ///
     /// `tsc_value` is the lower 7 bytes of current TSC value
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_tsc_packet(
         &mut self,
         context: &DecoderContext,
@@ -158,7 +158,7 @@ pub trait HandlePacket {
     /// Handle CBR packet
     ///
     /// `core_bus_ratio` is Core:Bus Ratio
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_cbr_packet(
         &mut self,
         context: &DecoderContext,
@@ -170,7 +170,7 @@ pub trait HandlePacket {
     /// Handle TMA packet
     ///
     /// `ctc` is `CTC[15:0]`, `fast_counter` is `FastCounter[7:0]`, `fc8` is `FC[8]`
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_tma_packet(
         &mut self,
         context: &DecoderContext,
@@ -184,7 +184,7 @@ pub trait HandlePacket {
     /// Handle VMCS packet
     ///
     /// `vmcs_pointer`'s 12..=51 bits are `VMCS pointer [51:12]` (other bits guaranteed cleared)
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_vmcs_packet(
         &mut self,
         context: &DecoderContext,
@@ -194,25 +194,25 @@ pub trait HandlePacket {
     }
 
     /// Handle OVF packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_ovf_packet(&mut self, context: &DecoderContext) -> Result<(), Self::Error> {
         Ok(())
     }
 
     /// Handle PSB packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_psb_packet(&mut self, context: &DecoderContext) -> Result<(), Self::Error> {
         Ok(())
     }
 
     /// Handle PSBEND packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_psbend_packet(&mut self, context: &DecoderContext) -> Result<(), Self::Error> {
         Ok(())
     }
 
     /// Handle TraceStop packet
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_trace_stop_packet(&mut self, context: &DecoderContext) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -221,7 +221,7 @@ pub trait HandlePacket {
     ///
     /// `cr3`'s 5..=51 bits are `CR3[51:5]` (other bits guaranteed cleared),
     /// `rsvd_nr` is RSVD/NR
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_pip_packet(
         &mut self,
         context: &DecoderContext,
@@ -234,7 +234,7 @@ pub trait HandlePacket {
     /// Handle MNT packet
     ///
     /// `payload` is `Payload[63:0]`
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_mnt_packet(&mut self, context: &DecoderContext, payload: u64) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -242,7 +242,7 @@ pub trait HandlePacket {
     /// Handle PTW packet
     ///
     /// `ip_bit` is the IP bit, `payload` is either 4 bytes or 8 bytes
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_ptw_packet(
         &mut self,
         context: &DecoderContext,
@@ -255,7 +255,7 @@ pub trait HandlePacket {
     /// Handle EXSTOP packet
     ///
     /// `ip_bit` is the IP bit
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_exstop_packet(
         &mut self,
         context: &DecoderContext,
@@ -267,7 +267,7 @@ pub trait HandlePacket {
     /// Handle MWAIT packet
     ///
     /// `mwait_hints` is `MWAIT Hints[7:0]`, `ext` is `EXT[1:0]` (upper 6 bits guaranteed cleared)
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_mwait_packet(
         &mut self,
         context: &DecoderContext,
@@ -281,7 +281,7 @@ pub trait HandlePacket {
     ///
     /// `hw` is HW, `resolved_thread_c_state` is Resolved Thread C-State (upper 4 bits guaranteed cleared),
     /// `resolved_thread_sub_c_state` is Resolved Thread Sub C-State (upper 4 bits guaranteed cleared)
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_pwre_packet(
         &mut self,
         context: &DecoderContext,
@@ -297,7 +297,7 @@ pub trait HandlePacket {
     /// `last_core_c_state` is Last Core C-State (upper 4 bits guaranteed cleared),
     /// `deepest_core_c_state` is Deepest Core C-State (upper 4 bits guaranteed cleared),
     /// `wake_reason` is Wake Reason (upper 4 bits guaranteed cleared)
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_pwrx_packet(
         &mut self,
         context: &DecoderContext,
@@ -311,7 +311,7 @@ pub trait HandlePacket {
     /// Handle EVD packet
     ///
     /// `r#type` is `Type[5:0]` (upper 2 bits guaranteed cleared), `payload` is `Payload[63:0]`
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_evd_packet(
         &mut self,
         context: &DecoderContext,
@@ -325,7 +325,7 @@ pub trait HandlePacket {
     ///
     /// `ip_bit` is the IP bit, `r#type` is `Type[4:0]` (upper 3 bits guaranteed cleared),
     /// `vector` is the `Vector[7:0]`
-    #[allow(unused)]
+    #[expect(unused)]
     fn on_cfe_packet(
         &mut self,
         context: &DecoderContext,
@@ -434,6 +434,10 @@ pub fn decode<H: HandlePacket>(
         tracee_mode,
         no_sync,
     } = options;
+
+    packet_handler
+        .at_decode_begin()
+        .map_err(DecoderError::PacketHandler)?;
 
     let start_pos = if no_sync {
         0

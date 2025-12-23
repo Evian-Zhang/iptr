@@ -1,7 +1,7 @@
 mod control_flow_handler;
 mod memory_reader;
 
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -18,8 +18,11 @@ struct Cmdline {
     page_dump: PathBuf,
     #[arg(long)]
     page_addr: PathBuf,
+    #[arg(long)]
+    round: Option<usize>,
 }
 
+#[expect(clippy::cast_precision_loss)]
 fn main() -> Result<()> {
     env_logger::init();
 
@@ -27,6 +30,7 @@ fn main() -> Result<()> {
         input,
         page_dump,
         page_addr,
+        round,
     } = Cmdline::parse();
 
     let mut memory_reader =
@@ -45,31 +49,74 @@ fn main() -> Result<()> {
     // SAFETY: check the safety requirements of memmap2 documentation
     let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
 
-    iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+    if let Some(round) = round {
+        if round <= 1 {
+            return Err(anyhow::anyhow!("Round should be larger than 1"));
+        }
 
-    #[cfg(feature = "debug")]
-    let (_, edge_analyzer) = packet_handler.into_inner();
-    #[cfg(not(feature = "debug"))]
-    let edge_analyzer = packet_handler;
+        let instant = Instant::now();
+        iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+        let cold_time = instant.elapsed();
+        log::info!("run_time_cold = {}", cold_time.as_nanos());
 
-    let DiagnosticInformation {
-        cfg_size,
-        cache8_size,
-        cache32_size,
-        cache_32bit_hit_count,
-        cache_8bit_hit_count,
-        cache_missed_bit_count,
-        cache_hit_ratio,
-    } = edge_analyzer.diagnose();
-    log::info!(
-        "After analyzer, CFG size {cfg_size}, \
-        8bit cache size {cache8_size}, \
-        32bit cache size {cache32_size}, \
-        8bit cache hit count {cache_8bit_hit_count}, \
-        32bit cache hit count {cache_32bit_hit_count}, \
-        missed cache count {cache_missed_bit_count}, \
-        cache hit ratio {cache_hit_ratio}"
-    );
+        let round = round - 1;
+        let mut total_time = 0;
+        for _ in 0..round {
+            let instant = Instant::now();
+            iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+            let time = instant.elapsed();
+            let time = time.as_nanos();
+            total_time += time;
+            log::info!("run_time = {time}");
+
+            #[cfg(not(feature = "debug"))]
+            {
+                let DiagnosticInformation {
+                    cfg_size,
+                    cache8_size,
+                    cache32_size,
+                    cache_32bit_hit_count,
+                    cache_8bit_hit_count,
+                    cache_missed_bit_count,
+                    cache_hit_ratio,
+                } = packet_handler.diagnose();
+                log::info!(
+                    "After analyzer, CFG size {cfg_size}, \
+                    8bit cache size {cache8_size}, \
+                    32bit cache size {cache32_size}, \
+                    8bit cache hit count {cache_8bit_hit_count}, \
+                    32bit cache hit count {cache_32bit_hit_count}, \
+                    missed cache count {cache_missed_bit_count}, \
+                    cache hit ratio {cache_hit_ratio}"
+                );
+            }
+        }
+        log::info!("avg_time = {}", total_time as f64 / round as f64);
+    } else {
+        iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+
+        #[cfg(not(feature = "debug"))]
+        {
+            let DiagnosticInformation {
+                cfg_size,
+                cache8_size,
+                cache32_size,
+                cache_32bit_hit_count,
+                cache_8bit_hit_count,
+                cache_missed_bit_count,
+                cache_hit_ratio,
+            } = packet_handler.diagnose();
+            log::info!(
+                "After analyzer, CFG size {cfg_size}, \
+                8bit cache size {cache8_size}, \
+                32bit cache size {cache32_size}, \
+                8bit cache hit count {cache_8bit_hit_count}, \
+                32bit cache hit count {cache_32bit_hit_count}, \
+                missed cache count {cache_missed_bit_count}, \
+                cache hit ratio {cache_hit_ratio}"
+            );
+        }
+    }
 
     Ok(())
 }
