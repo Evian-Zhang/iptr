@@ -56,9 +56,19 @@ fn main() -> Result<()> {
         cfg_size,
         cache8_size,
         cache32_size,
+        cache_32bit_hit_count,
+        cache_8bit_hit_count,
+        cache_missed_bit_count,
+        cache_hit_ratio,
     } = edge_analyzer.diagnose();
     log::info!(
-        "After analyzer, CFG size {cfg_size}, 8bit cache size {cache8_size}, 32bit cache size {cache32_size}"
+        "After analyzer, CFG size {cfg_size}, \
+        8bit cache size {cache8_size}, \
+        32bit cache size {cache32_size}, \
+        8bit cache hit count {cache_8bit_hit_count}, \
+        32bit cache hit count {cache_32bit_hit_count}, \
+        missed cache count {cache_missed_bit_count}, \
+        cache hit ratio {cache_hit_ratio}"
     );
 
     Ok(())

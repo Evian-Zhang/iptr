@@ -101,6 +101,12 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
     /// CFG node maintainer
     static_analyzer: StaticControlFlowAnalyzer,
+    #[cfg(feature = "cache")]
+    cache_8bit_hit_count: usize,
+    #[cfg(feature = "cache")]
+    cache_32bit_hit_count: usize,
+    #[cfg(feature = "cache")]
+    cache_missed_bit_count: usize,
     /// Passed control flow handler
     handler: &'a mut H,
     /// Passed memory reader
@@ -119,6 +125,12 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             #[cfg(feature = "cache")]
             cache_manager: ControlFlowCacheManager::new(),
             static_analyzer: StaticControlFlowAnalyzer::new(),
+            #[cfg(feature = "cache")]
+            cache_32bit_hit_count: 0,
+            #[cfg(feature = "cache")]
+            cache_8bit_hit_count: 0,
+            #[cfg(feature = "cache")]
+            cache_missed_bit_count: 0,
             handler,
             reader,
         }
@@ -176,6 +188,10 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         last_bb_ref: &mut u64,
         is_taken: bool,
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
+        #[cfg(feature = "cache")]
+        {
+            self.cache_missed_bit_count += 1;
+        }
         let mut last_bb = *last_bb_ref;
         #[cfg(feature = "cache")]
         let mut cached_key = None;

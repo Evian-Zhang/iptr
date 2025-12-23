@@ -11,9 +11,10 @@ use iptr_decoder::DecoderContext;
 
 #[cfg(feature = "cache")]
 use self::cache::CachableInformation;
+#[cfg(feature = "cache")]
+use crate::error::AnalyzerError;
 use crate::{
-    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed,
-    error::{AnalyzerError, AnalyzerResult},
+    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed, error::AnalyzerResult,
     tnt_buffer::TntBuffer,
 };
 
@@ -157,6 +158,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     ) -> AnalyzerResult<TntProceed, H, R> {
         #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_dword(*last_bb_ref, tnt_buffer) {
+            self.cache_32bit_hit_count += 1;
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
@@ -270,6 +272,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
         #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_byte(*last_bb_ref, tnt_bits) {
+            self.cache_8bit_hit_count += 1;
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
