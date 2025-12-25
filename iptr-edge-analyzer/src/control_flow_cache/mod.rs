@@ -45,33 +45,14 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         tnt_buffer: TntBuffer,
     ) -> AnalyzerResult<(), H, R> {
         let remain_bits = tnt_buffer.bits();
-        let round32 = remain_bits / 32;
         let round8 = (remain_bits % 32) / 8;
         let round1 = remain_bits % 8;
-        let mut remain_buffer_value = u64::from_le_bytes(tnt_buffer.get_array_qword());
-        for round in 0..round32 {
-            let tnt_proceed = self.handle_tnt_buffer32(
-                context,
-                last_bb_ref,
-                ((remain_buffer_value >> u32::BITS) as u32).to_le_bytes(),
-            )?;
-            if let TntProceed::Break {
-                processed_bit_count,
-                pre_tip_status,
-            } = tnt_proceed
-            {
-                let remain_buf =
-                    tnt_buffer.remove_first_n_bits(processed_bit_count + round * u32::BITS);
-                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
-                return Ok(());
-            }
-            remain_buffer_value <<= u32::BITS;
-        }
+        let mut remain_buffer_value = u32::from_le_bytes(tnt_buffer.get_array_qword());
         for round in 0..round8 {
             let (_new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(
                 context,
                 last_bb_ref,
-                (remain_buffer_value >> (u64::BITS - u8::BITS)) as u8,
+                (remain_buffer_value >> (u32::BITS - u8::BITS)) as u8,
             )?;
             if let TntProceed::Break {
                 processed_bit_count,
@@ -79,7 +60,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             } = tnt_proceed
             {
                 let remain_buf = tnt_buffer.remove_first_n_bits(
-                    processed_bit_count + round * u8::BITS + round32 * u32::BITS,
+                    processed_bit_count + round * u8::BITS,
                 );
                 self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
@@ -87,7 +68,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             remain_buffer_value <<= u8::BITS;
         }
         for round in 0..round1 {
-            let tnt_bit = (remain_buffer_value & (1 << 63)) != 0;
+            let tnt_bit = (remain_buffer_value & (1 << 31)) != 0;
             let (_new_cached_key, tnt_proceed) =
                 self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
@@ -97,7 +78,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             {
                 // Current bit is not processed, and reserved for processing after next TIP
                 let remain_buf =
-                    tnt_buffer.remove_first_n_bits(round + round8 * u8::BITS + round32 * u32::BITS);
+                    tnt_buffer.remove_first_n_bits(round + round8 * u8::BITS);
                 self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
@@ -115,24 +96,14 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         last_bb_ref: &mut u64,
         tnt_buffer: TntBuffer,
     ) -> AnalyzerResult<(), H, R> {
-        let [b0, b1, b2, b3, b4, b5, b6, b7] = tnt_buffer.get_array_qword();
-        let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b4, b5, b6, b7])?;
-        if let TntProceed::Break {
-            processed_bit_count,
-            pre_tip_status,
-        } = tnt_proceed
-        {
-            let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count);
-            self.mark_deferred_tip(remain_buf, pre_tip_status)?;
-            return Ok(());
-        }
+        let [b0, b1, b2, b3] = tnt_buffer.get_array_qword();
         let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
         if let TntProceed::Break {
             processed_bit_count,
             pre_tip_status,
         } = tnt_proceed
         {
-            let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count + u32::BITS);
+            let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count);
             self.mark_deferred_tip(remain_buf, pre_tip_status)?;
             return Ok(());
         }
