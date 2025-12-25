@@ -499,10 +499,11 @@ where
         self.reader
             .at_decode_begin()
             .map_err(AnalyzerError::MemoryReader)?;
-        #[cfg(feature = "cache")]
+        #[cfg(all(feature = "cache", feature = "more_diagnose"))]
         {
             self.cache_32bit_hit_count = 0;
             self.cache_8bit_hit_count = 0;
+            self.cache_trailing_bits_hit_count = 0;
             self.cache_missed_bit_count = 0;
         }
 
