@@ -10,20 +10,20 @@ use crate::{
 /// This will only be retrieved from a [`TntBufferManager`]
 #[derive(Clone, Copy)]
 pub struct TntBuffer {
-    /// 64 bits container
+    /// 32 bits container
     value: u32,
-    /// Number of used bits, no more than [`u64::BITS`].
+    /// Number of used bits, no more than [`u32::BITS`].
     bits: u32,
 }
 
 impl TntBuffer {
-    /// Take all 64 TNT bits
-    pub fn get_array_qword(&self) -> [u8; 4] {
+    /// Take all 32 TNT bits
+    pub fn get_array_dword(self) -> [u8; 4] {
         self.value.to_le_bytes()
     }
 
-    /// Get current bits count. The bits count will not be greater than [`u64::BITS`].
-    pub fn bits(&self) -> u32 {
+    /// Get current bits count. The bits count will not be greater than [`u32::BITS`].
+    pub fn bits(self) -> u32 {
         self.bits
     }
 
@@ -32,12 +32,12 @@ impl TntBuffer {
     /// # Examples
     ///
     /// ```rust, ignore
-    /// # let buf = TntBuffer { value: u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b1100_1000]), bits: 5 };
+    /// # let buf = TntBuffer { value: u32::from_le_bytes([0, 0, 0, 0b1100_1000]), bits: 5 };
     /// // let buf = ...
-    /// assert_eq!(buf.to_array_qword(), [0, 0, 0, 0, 0, 0, 0, 0b1100_1000]);
+    /// assert_eq!(buf.to_array_dword(), [0, 0, 0, 0b1100_1000]);
     /// assert_eq!(buf.bits(), 5);
     /// let new_buf = buf.remove_first_n_bits(2);
-    /// assert_eq!(buf.to_array_qword(), [0, 0, 0, 0, 0, 0, 0, 0b0010_0000]);
+    /// assert_eq!(buf.to_array_dword(), [0, 0, 0, 0b0010_0000]);
     /// assert_eq!(buf.bits(), 3);
     /// ```
     pub fn remove_first_n_bits(self, n: u32) -> Self {
@@ -132,6 +132,7 @@ impl TntBufferManager {
     ///
     /// You must pass a long TNT format packet here. The first two bytes must be stripped,
     /// as done by decoder. As a result, the upmost two bytes of `long_tnt_packet` are cleared.
+    #[expect(clippy::cast_possible_truncation)]
     #[must_use]
     pub fn extend_with_long_tnt(&mut self, long_tnt_packet: u64) -> Option<TntBuffer> {
         debug_assert_eq!(
@@ -203,147 +204,116 @@ impl TntBufferManager {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     impl TntBufferManager {
-//         /// May not be full
-//         fn buffer(&self) -> TntBuffer {
-//             self.buf
-//         }
-//     }
+    impl TntBufferManager {
+        /// May not be full
+        fn buffer(&self) -> TntBuffer {
+            self.buf
+        }
+    }
 
-//     #[test]
-//     fn test_buffer_extend_zero_short_tnt() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_zero_short_tnt() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         // No TNT bits in this packet
-//         let full_buf = buffer_manager.extend_with_short_tnt(0b0000_0010);
-//         assert!(full_buf.is_none());
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(buf.value, 0b0);
-//         assert_eq!(buf.bits, 0);
-//     }
+        // No TNT bits in this packet
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0000_0010);
+        assert!(full_buf.is_none());
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, 0b0);
+        assert_eq!(buf.bits, 0);
+    }
 
-//     #[test]
-//     fn test_buffer_extend_short_tnt_from_zero() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_short_tnt_from_zero() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
-//         assert!(full_buf.is_none());
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(
-//             buf.value,
-//             u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b10101_000])
-//         );
-//         assert_eq!(buf.bits, 5);
-//     }
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
+        assert!(full_buf.is_none());
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, u32::from_le_bytes([0, 0, 0, 0b10101_000]));
+        assert_eq!(buf.bits, 5);
+    }
 
-//     #[test]
-//     fn test_buffer_extend_short_tnt_until_full() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_short_tnt_until_full() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         for loop_count in 0..12 {
-//             // Each time will add 5 bits, after 13 times, will reach full
-//             let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
-//             assert!(full_buf.is_none());
-//             assert_eq!(buffer_manager.buffer().bits, 5 * (loop_count + 1));
-//         }
-//         let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
-//         assert!(full_buf.is_some());
-//         if let Some(full_buf) = full_buf {
-//             assert_eq!(
-//                 full_buf.value,
-//                 0b10101_10101_10101_10101_10101_10101_10101_10101_10101_10101_10101_10101_1010
-//             );
-//             assert_eq!(full_buf.bits, u64::BITS);
-//         }
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(
-//             buf.value,
-//             u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b1000_0000])
-//         );
-//         assert_eq!(buf.bits, 1);
-//     }
+        for loop_count in 0..6 {
+            // Each time will add 5 bits, after 7 times, will reach full
+            let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
+            assert!(full_buf.is_none());
+            assert_eq!(buffer_manager.buffer().bits, 5 * (loop_count + 1));
+        }
+        let full_buf = buffer_manager.extend_with_short_tnt(0b0110_1010);
+        assert!(full_buf.is_some());
+        if let Some(full_buf) = full_buf {
+            assert_eq!(full_buf.value, 0b10101_10101_10101_10101_10101_10101_10);
+            assert_eq!(full_buf.bits, u32::BITS);
+        }
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, u32::from_le_bytes([0, 0, 0, 0b1010_0000]));
+        assert_eq!(buf.bits, 3);
+    }
 
-//     #[test]
-//     fn test_buffer_extend_zero_long_tnt() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_zero_long_tnt() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         // No TNT bits in this packet
-//         let full_buf =
-//             buffer_manager.extend_with_long_tnt(u64::from_le_bytes([0x1, 0, 0, 0, 0, 0, 0, 0]));
-//         assert!(full_buf.is_none());
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(buf.value, 0b0);
-//         assert_eq!(buf.bits, 0);
-//     }
+        // No TNT bits in this packet
+        let full_buf =
+            buffer_manager.extend_with_long_tnt(u64::from_le_bytes([0x1, 0, 0, 0, 0, 0, 0, 0]));
+        assert!(full_buf.is_none());
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, 0b0);
+        assert_eq!(buf.bits, 0);
+    }
 
-//     #[test]
-//     fn test_buffer_extend_long_tnt_from_zero() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_long_tnt_from_zero() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
-//             0b1111_1101,
-//             0,
-//             0,
-//             0,
-//             0,
-//             0,
-//             0,
-//             0,
-//         ]));
-//         assert!(full_buf.is_none());
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(
-//             buf.value,
-//             u64::from_le_bytes([0, 0, 0, 0, 0, 0, 0, 0b1111_1010])
-//         );
-//         assert_eq!(buf.bits, 7);
-//     }
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b1111_1101,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ]));
+        assert!(full_buf.is_none());
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, u32::from_le_bytes([0, 0, 0, 0b1111_1010]));
+        assert_eq!(buf.bits, 7);
+    }
 
-//     #[test]
-//     fn test_buffer_extend_long_tnt_until_full() {
-//         let mut buffer_manager = TntBufferManager::default();
+    #[test]
+    fn test_buffer_extend_long_tnt_until_full() {
+        let mut buffer_manager = TntBufferManager::default();
 
-//         // This will add 47 TNT bits
-//         let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0,
-//             0,
-//         ]));
-//         assert!(full_buf.is_none());
-//         assert_eq!(buffer_manager.buffer().bits, 47);
-//         // This will add another 47 TNT bits, remain 30 bits
-//         let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0b1111_1101,
-//             0,
-//             0,
-//         ]));
-//         assert!(full_buf.is_some());
-//         if let Some(full_buf) = full_buf {
-//             assert_eq!(
-//                 full_buf.value,
-//                 0b111_1101_1111_1101_1111_1101_1111_1101_1111_1101_1111_1101_111_1101_1111_1101_11
-//             );
-//             assert_eq!(full_buf.bits, u64::BITS);
-//         }
-//         let buf = buffer_manager.buffer();
-//         assert_eq!(
-//             buf.value,
-//             0b11_1101_1111_1101_1111_1101_1111_1101_00_0000_0000_0000_0000_0000_0000_0000_0000
-//         );
-//         assert_eq!(buf.bits, 30);
-//     }
-// }
+        // This will add 47 TNT bits, remain 15 bits
+        let full_buf = buffer_manager.extend_with_long_tnt(u64::from_le_bytes([
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0b1111_1101,
+            0,
+            0,
+        ]));
+        assert!(full_buf.is_some());
+        if let Some(full_buf) = full_buf {
+            assert_eq!(full_buf.value, 0b111_1101_1111_1101_1111_1101_1111_1101_1);
+            assert_eq!(full_buf.bits, u32::BITS);
+        }
+        let buf = buffer_manager.buffer();
+        assert_eq!(buf.value, 0b111_1101_1111_1101_0_0000_0000_0000_0000);
+        assert_eq!(buf.bits, 15);
+    }
+}

@@ -11,10 +11,18 @@ struct ControlFlowSequence8 {
     cached_tnts: [u8; 1],
 }
 
-#[derive(Clone, Copy)]
+/// Compact representation of trailing bits
+///
+/// The lower 8 bits are trailing bits itself (from MSB to LSB),
+/// The upper 8 bits are number of bits
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct TrailingBits(u16);
 
 impl TrailingBits {
+    /// Create a new trailing bits
+    ///
+    /// The bits shall never exceed 7 bits
+    #[expect(clippy::cast_possible_truncation)]
     pub fn new(remain_tnt_buffer: u32, remain_bits: u32) -> Self {
         debug_assert_eq!(
             remain_tnt_buffer & 0x00FF_FFFF,
@@ -28,11 +36,11 @@ impl TrailingBits {
 
 /// Key structure for the 8bit cache hash map.
 #[derive(Hash, PartialEq, Eq)]
-struct ControlFlowSequence16 {
+struct ControlFlowSequenceTrailBits {
     /// Absolute address starting the TNT sequences
     start_bb: u64,
-    /// 8 bits TNT sequences
-    cached_tnts: u16,
+    /// Trailing bits
+    trailing_bits: TrailingBits,
 }
 
 /// Key structure for the 32bit cache hash map.
@@ -40,7 +48,7 @@ struct ControlFlowSequence16 {
 struct ControlFlowSequence32 {
     /// Absolute address starting the TNT sequences
     start_bb: u64,
-    ///32 bits TNT sequences
+    /// 32 bits TNT sequences
     cached_tnts: [u8; 4],
 }
 
@@ -66,7 +74,8 @@ pub struct ControlFlowCacheManager<D> {
     cache8: HashMap<ControlFlowSequence8, CachableInformation<D>>,
     /// Internal 32bit cache structure, will become very large
     cache32: HashMap<ControlFlowSequence32, CachableInformation<D>>,
-    cache_trailing_bits: HashMap<ControlFlowSequence16, CachableInformation<D>>,
+    /// Internal trailing bits cache structure, will become very large
+    cache_trailing_bits: HashMap<ControlFlowSequenceTrailBits, CachableInformation<D>>,
 }
 
 const CACHE_MAP_INITIAL_CAPACITY: usize = 0x100;
@@ -112,31 +121,29 @@ impl<D> ControlFlowCacheManager<D> {
         );
     }
 
-    /// Get cached information for 8 bits TNTs
+    /// Get cached information for trailing TNT bits
     pub fn get_trailing_bits(
         &self,
         start_bb: u64,
         trailing_bits: TrailingBits,
     ) -> Option<&CachableInformation<D>> {
-        let TrailingBits(cached_tnts) = trailing_bits;
-        self.cache_trailing_bits.get(&ControlFlowSequence16 {
+        self.cache_trailing_bits.get(&ControlFlowSequenceTrailBits {
             start_bb,
-            cached_tnts,
+            trailing_bits,
         })
     }
 
-    /// Set cache entry for 8 bits TNTs
+    /// Set cache entry for trailing TNT bits
     pub fn insert_trailing_bits(
         &mut self,
         start_bb: u64,
         trailing_bits: TrailingBits,
         info: CachableInformation<D>,
     ) {
-        let TrailingBits(cached_tnts) = trailing_bits;
         self.cache_trailing_bits.insert(
-            ControlFlowSequence16 {
+            ControlFlowSequenceTrailBits {
                 start_bb,
-                cached_tnts,
+                trailing_bits,
             },
             info,
         );

@@ -10,12 +10,12 @@ pub use cache::ControlFlowCacheManager;
 use iptr_decoder::DecoderContext;
 
 #[cfg(feature = "cache")]
-use self::cache::CachableInformation;
+use self::cache::{CachableInformation, TrailingBits};
 #[cfg(feature = "cache")]
 use crate::error::AnalyzerError;
 use crate::{
-    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed,
-    control_flow_cache::cache::TrailingBits, error::AnalyzerResult, tnt_buffer::TntBuffer,
+    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed, error::AnalyzerResult,
+    tnt_buffer::TntBuffer,
 };
 
 impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
@@ -47,7 +47,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         let remain_bits = tnt_buffer.bits();
         let round8 = (remain_bits % 32) / 8;
         let round1 = remain_bits % 8;
-        let mut remain_buffer_value = u32::from_le_bytes(tnt_buffer.get_array_qword());
+        let mut remain_buffer_value = u32::from_le_bytes(tnt_buffer.get_array_dword());
         for round in 0..round8 {
             let (_new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(
                 context,
@@ -66,48 +66,23 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             }
             remain_buffer_value <<= u8::BITS;
         }
-        let start_bb = *last_bb_ref;
-        let trailing_bits = TrailingBits::new(remain_buffer_value, round1);
         if round1 != 0 {
-            if let Some(cached_info) = self
-                .cache_manager
-                .get_trailing_bits(*last_bb_ref, trailing_bits)
+            let tnt_proceed = self.handle_tnt_buffer_trailing_bits(
+                context,
+                last_bb_ref,
+                remain_buffer_value,
+                round1,
+            )?;
+            if let TntProceed::Break {
+                processed_bit_count,
+                pre_tip_status,
+            } = tnt_proceed
             {
-                *last_bb_ref = cached_info.new_bb;
-                if let Some(cached_key) = &cached_info.user_data {
-                    self.handler
-                        .on_reused_cache(cached_key)
-                        .map_err(AnalyzerError::ControlFlowHandler)?;
-                }
-
-                // TODO: The clone can be optimized using the `entry` API
-                // and `Cow` structure.
+                let remain_buf =
+                    tnt_buffer.remove_first_n_bits(processed_bit_count + round8 * u8::BITS);
+                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
-            for round in 0..round1 {
-                let tnt_bit = (remain_buffer_value & (1 << 31)) != 0;
-                let (_new_cached_key, tnt_proceed) =
-                    self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
-                if let TntProceed::Break {
-                    processed_bit_count: _,
-                    pre_tip_status,
-                } = tnt_proceed
-                {
-                    // Current bit is not processed, and reserved for processing after next TIP
-                    let remain_buf = tnt_buffer.remove_first_n_bits(round + round8 * u8::BITS);
-                    self.mark_deferred_tip(remain_buf, pre_tip_status)?;
-                    return Ok(());
-                }
-                remain_buffer_value <<= 1;
-            }
-            self.cache_manager.insert_trailing_bits(
-                start_bb,
-                trailing_bits,
-                CachableInformation {
-                    user_data: None,
-                    new_bb: *last_bb_ref,
-                },
-            );
         }
 
         Ok(())
@@ -121,7 +96,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         last_bb_ref: &mut u64,
         tnt_buffer: TntBuffer,
     ) -> AnalyzerResult<(), H, R> {
-        let [b0, b1, b2, b3] = tnt_buffer.get_array_qword();
+        let [b0, b1, b2, b3] = tnt_buffer.get_array_dword();
         let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
         if let TntProceed::Break {
             processed_bit_count,
@@ -278,12 +253,10 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
         let mut cached_keys = [const { MaybeUninit::uninit() }; 8];
         let start_bb = *last_bb_ref;
         // The default value does not matter. The for-loop must run at least once
-        let mut tnt_proceed = TntProceed::Continue;
         for bit in (0..8).rev() {
             let tnt_bit = (tnt_bits & (1 << bit)) != 0;
-            let (new_cached_key, this_tnt_proceed) =
+            let (new_cached_key, tnt_proceed) =
                 self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
-            tnt_proceed = this_tnt_proceed;
             if let TntProceed::Break {
                 processed_bit_count: _,
                 pre_tip_status,
@@ -317,13 +290,85 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                     new_bb: *last_bb_ref,
                 },
             );
-            Ok((cached_key, tnt_proceed))
+            Ok((cached_key, TntProceed::Continue))
         }
         #[cfg(not(feature = "cache"))]
         {
             let _ = start_bb;
             let _ = cached_keys;
-            Ok((None, tnt_proceed))
+            Ok((None, TntProceed::Continue))
+        }
+    }
+
+    /// `remain_bits` shall be in range 1..=7
+    fn handle_tnt_buffer_trailing_bits(
+        &mut self,
+        context: &DecoderContext,
+        last_bb_ref: &mut u64,
+        mut remain_tnt_buffer: u32,
+        remain_bits: u32,
+    ) -> AnalyzerResult<TntProceed, H, R> {
+        debug_assert!((1..=7).contains(&remain_bits), "Unexpected remain bits");
+        #[cfg(feature = "cache")]
+        let trailing_bits = TrailingBits::new(remain_tnt_buffer, remain_bits);
+        #[cfg(feature = "cache")]
+        if let Some(cached_info) = self
+            .cache_manager
+            .get_trailing_bits(*last_bb_ref, trailing_bits)
+        {
+            *last_bb_ref = cached_info.new_bb;
+            if let Some(cached_key) = &cached_info.user_data {
+                self.handler
+                    .on_reused_cache(cached_key)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
+            }
+
+            return Ok(TntProceed::Continue);
+        }
+        let mut cached_keys = [const { MaybeUninit::uninit() }; 8];
+        let start_bb = *last_bb_ref;
+        for bit in (0..remain_bits).rev() {
+            let tnt_bit = (remain_tnt_buffer & (1 << 31)) != 0;
+            let (new_cached_key, tnt_proceed) =
+                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
+            if let TntProceed::Break {
+                processed_bit_count: _,
+                pre_tip_status,
+            } = tnt_proceed
+            {
+                // Current bit is not processed, and reserved for processing after next TIP
+                return Ok(TntProceed::Break {
+                    processed_bit_count: remain_bits - bit - 1,
+                    pre_tip_status,
+                });
+            }
+            remain_tnt_buffer <<= 1;
+            cached_keys[(remain_bits - bit - 1) as usize].write(new_cached_key);
+        }
+        #[cfg(feature = "cache")]
+        {
+            let mut cached_key = None;
+            for new_cached_key in cached_keys.into_iter().take(remain_bits as usize) {
+                // SAFETY: All elements are written
+                let new_cached_key = unsafe { new_cached_key.assume_init() };
+                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
+            }
+            // The cache will only be inserted if `TntProceed` is always `Continue`
+            self.cache_manager.insert_trailing_bits(
+                start_bb,
+                trailing_bits,
+                CachableInformation {
+                    user_data: cached_key.clone(),
+                    new_bb: *last_bb_ref,
+                },
+            );
+            Ok(TntProceed::Continue)
+        }
+        #[cfg(not(feature = "cache"))]
+        {
+            let _ = start_bb;
+            let _ = cached_keys;
+            Ok(TntProceed::Continue)
         }
     }
 }
