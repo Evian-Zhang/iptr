@@ -14,8 +14,8 @@ use self::cache::CachableInformation;
 #[cfg(feature = "cache")]
 use crate::error::AnalyzerError;
 use crate::{
-    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed, error::AnalyzerResult,
-    tnt_buffer::TntBuffer,
+    EdgeAnalyzer, HandleControlFlow, PreTipStatus, ReadMemory, TntProceed,
+    control_flow_cache::cache::TrailingBits, error::AnalyzerResult, tnt_buffer::TntBuffer,
 };
 
 impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
@@ -59,30 +59,55 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 pre_tip_status,
             } = tnt_proceed
             {
-                let remain_buf = tnt_buffer.remove_first_n_bits(
-                    processed_bit_count + round * u8::BITS,
-                );
+                let remain_buf =
+                    tnt_buffer.remove_first_n_bits(processed_bit_count + round * u8::BITS);
                 self.mark_deferred_tip(remain_buf, pre_tip_status)?;
                 return Ok(());
             }
             remain_buffer_value <<= u8::BITS;
         }
-        for round in 0..round1 {
-            let tnt_bit = (remain_buffer_value & (1 << 31)) != 0;
-            let (_new_cached_key, tnt_proceed) =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
-            if let TntProceed::Break {
-                processed_bit_count: _,
-                pre_tip_status,
-            } = tnt_proceed
+        let start_bb = *last_bb_ref;
+        let trailing_bits = TrailingBits::new(remain_buffer_value, round1);
+        if round1 != 0 {
+            if let Some(cached_info) = self
+                .cache_manager
+                .get_trailing_bits(*last_bb_ref, trailing_bits)
             {
-                // Current bit is not processed, and reserved for processing after next TIP
-                let remain_buf =
-                    tnt_buffer.remove_first_n_bits(round + round8 * u8::BITS);
-                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
+                *last_bb_ref = cached_info.new_bb;
+                if let Some(cached_key) = &cached_info.user_data {
+                    self.handler
+                        .on_reused_cache(cached_key)
+                        .map_err(AnalyzerError::ControlFlowHandler)?;
+                }
+
+                // TODO: The clone can be optimized using the `entry` API
+                // and `Cow` structure.
                 return Ok(());
             }
-            remain_buffer_value <<= 1;
+            for round in 0..round1 {
+                let tnt_bit = (remain_buffer_value & (1 << 31)) != 0;
+                let (_new_cached_key, tnt_proceed) =
+                    self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
+                if let TntProceed::Break {
+                    processed_bit_count: _,
+                    pre_tip_status,
+                } = tnt_proceed
+                {
+                    // Current bit is not processed, and reserved for processing after next TIP
+                    let remain_buf = tnt_buffer.remove_first_n_bits(round + round8 * u8::BITS);
+                    self.mark_deferred_tip(remain_buf, pre_tip_status)?;
+                    return Ok(());
+                }
+                remain_buffer_value <<= 1;
+            }
+            self.cache_manager.insert_trailing_bits(
+                start_bb,
+                trailing_bits,
+                CachableInformation {
+                    user_data: None,
+                    new_bb: *last_bb_ref,
+                },
+            );
         }
 
         Ok(())
