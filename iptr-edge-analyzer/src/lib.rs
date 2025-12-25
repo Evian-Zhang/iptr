@@ -278,7 +278,6 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                         return Err(AnalyzerError::InvalidPacket);
                     }
                     return Err(AnalyzerError::UnsupportedReturnCompression);
-                    // update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
                 }
                 FarTransfers {
                     next_instruction: _,
