@@ -124,7 +124,10 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     ) -> AnalyzerResult<TntProceed, H, R> {
         #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_dword(*last_bb_ref, tnt_buffer) {
-            self.cache_32bit_hit_count += 1;
+            #[cfg(feature = "more_diagnose")]
+            {
+                self.cache_32bit_hit_count += 1;
+            }
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
@@ -238,7 +241,10 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
         #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_byte(*last_bb_ref, tnt_bits) {
-            self.cache_8bit_hit_count += 1;
+            #[cfg(feature = "more_diagnose")]
+            {
+                self.cache_8bit_hit_count += 1;
+            }
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
@@ -316,6 +322,10 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             .cache_manager
             .get_trailing_bits(*last_bb_ref, trailing_bits)
         {
+            #[cfg(feature = "more_diagnose")]
+            {
+                self.cache_trailing_bits_hit_count += 1;
+            }
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler

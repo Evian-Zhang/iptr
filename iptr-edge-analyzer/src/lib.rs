@@ -1,6 +1,6 @@
 mod control_flow_cache;
 mod control_flow_handler;
-pub mod diagnose;
+mod diagnose;
 pub mod error;
 mod memory_reader;
 mod static_analyzer;
@@ -14,6 +14,7 @@ use iptr_decoder::{DecoderContext, HandlePacket, IpReconstructionPattern};
 use crate::control_flow_cache::ControlFlowCacheManager;
 pub use crate::{
     control_flow_handler::{ControlFlowTransitionKind, HandleControlFlow},
+    diagnose::DiagnosticInformation,
     memory_reader::ReadMemory,
 };
 use crate::{
@@ -101,11 +102,17 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     cache_manager: ControlFlowCacheManager<Option<H::CachedKey>>,
     /// CFG node maintainer
     static_analyzer: StaticControlFlowAnalyzer,
-    #[cfg(feature = "cache")]
+    /// Diagnose-related metrics
+    #[cfg(all(feature = "cache", feature = "more_diagnose"))]
+    cache_trailing_bits_hit_count: usize,
+    /// Diagnose-related metrics
+    #[cfg(all(feature = "cache", feature = "more_diagnose"))]
     cache_8bit_hit_count: usize,
-    #[cfg(feature = "cache")]
+    /// Diagnose-related metrics
+    #[cfg(all(feature = "cache", feature = "more_diagnose"))]
     cache_32bit_hit_count: usize,
-    #[cfg(feature = "cache")]
+    /// Diagnose-related metrics
+    #[cfg(all(feature = "cache", feature = "more_diagnose"))]
     cache_missed_bit_count: usize,
     /// Passed control flow handler
     handler: &'a mut H,
@@ -125,11 +132,13 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             #[cfg(feature = "cache")]
             cache_manager: ControlFlowCacheManager::new(),
             static_analyzer: StaticControlFlowAnalyzer::new(),
-            #[cfg(feature = "cache")]
+            #[cfg(all(feature = "cache", feature = "more_diagnose"))]
             cache_32bit_hit_count: 0,
-            #[cfg(feature = "cache")]
+            #[cfg(all(feature = "cache", feature = "more_diagnose"))]
             cache_8bit_hit_count: 0,
-            #[cfg(feature = "cache")]
+            #[cfg(all(feature = "cache", feature = "more_diagnose"))]
+            cache_trailing_bits_hit_count: 0,
+            #[cfg(all(feature = "cache", feature = "more_diagnose"))]
             cache_missed_bit_count: 0,
             handler,
             reader,
@@ -188,7 +197,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         last_bb_ref: &mut u64,
         is_taken: bool,
     ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
-        #[cfg(feature = "cache")]
+        #[cfg(all(feature = "cache", feature = "more_diagnose"))]
         {
             self.cache_missed_bit_count += 1;
         }

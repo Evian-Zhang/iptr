@@ -97,9 +97,13 @@ impl<D> ControlFlowCacheManager<D> {
         Self::default()
     }
 
-    /// Get the size of 8bit cache and 32bit cache, respectively
-    pub fn cache_size(&self) -> (usize, usize) {
-        (self.cache8.len(), self.cache32.len())
+    /// Get the size of trailing bits cache, 8bit cache and 32bit cache, respectively
+    pub fn cache_size(&self) -> (usize, usize, usize) {
+        (
+            self.cache_trailing_bits.len(),
+            self.cache8.len(),
+            self.cache32.len(),
+        )
     }
 
     /// Get cached information for 8 bits TNTs

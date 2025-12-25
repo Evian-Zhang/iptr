@@ -9,7 +9,16 @@ repository = { workspace = true }
 
 [features]
 default = ["cache"]
+## Enable cache to boost the performance.
+## However, when enabling this feature, you should carefully
+## design the `CachedKey` structure of your control flow handler,
+## otherwise the callbacks would be wrongly passed since we have
+## cached most of PT packet handling
 cache = []
+## Add more diagnostic information in the `DiagnosticInformation`
+## structure. These information would impose a little performance
+## overhead, but is very useful for debugging.
+more_diagnose = []
 
 [lints]
 workspace = true

@@ -6,7 +6,7 @@ use std::{fs::File, path::PathBuf, time::Instant};
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
-use iptr_edge_analyzer::{EdgeAnalyzer, diagnose::DiagnosticInformation};
+use iptr_edge_analyzer::{DiagnosticInformation, EdgeAnalyzer};
 
 use crate::{control_flow_handler::FuzzBitmapControlFlowHandler, memory_reader::MemoryReader};
 
@@ -58,6 +58,8 @@ fn main() -> Result<()> {
         iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
         let cold_time = instant.elapsed();
         log::info!("run_time_cold = {}", cold_time.as_nanos());
+        #[cfg(not(feature = "debug"))]
+        report_diagnose(&packet_handler.diagnose());
 
         let round = round - 1;
         let mut total_time = 0;
@@ -70,53 +72,39 @@ fn main() -> Result<()> {
             log::info!("run_time = {time}");
 
             #[cfg(not(feature = "debug"))]
-            {
-                let DiagnosticInformation {
-                    cfg_size,
-                    cache8_size,
-                    cache32_size,
-                    cache_32bit_hit_count,
-                    cache_8bit_hit_count,
-                    cache_missed_bit_count,
-                    cache_hit_ratio,
-                } = packet_handler.diagnose();
-                log::info!(
-                    "After analyzer, CFG size {cfg_size}, \
-                    8bit cache size {cache8_size}, \
-                    32bit cache size {cache32_size}, \
-                    8bit cache hit count {cache_8bit_hit_count}, \
-                    32bit cache hit count {cache_32bit_hit_count}, \
-                    missed cache count {cache_missed_bit_count}, \
-                    cache hit ratio {cache_hit_ratio}"
-                );
-            }
+            report_diagnose(&packet_handler.diagnose());
         }
         log::info!("avg_time = {}", total_time as f64 / round as f64);
     } else {
         iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
 
         #[cfg(not(feature = "debug"))]
-        {
-            let DiagnosticInformation {
-                cfg_size,
-                cache8_size,
-                cache32_size,
-                cache_32bit_hit_count,
-                cache_8bit_hit_count,
-                cache_missed_bit_count,
-                cache_hit_ratio,
-            } = packet_handler.diagnose();
-            log::info!(
-                "After analyzer, CFG size {cfg_size}, \
-                8bit cache size {cache8_size}, \
-                32bit cache size {cache32_size}, \
-                8bit cache hit count {cache_8bit_hit_count}, \
-                32bit cache hit count {cache_32bit_hit_count}, \
-                missed cache count {cache_missed_bit_count}, \
-                cache hit ratio {cache_hit_ratio}"
-            );
-        }
+        report_diagnose(&packet_handler.diagnose());
     }
 
     Ok(())
+}
+
+#[allow(unused)]
+fn report_diagnose(diagnostic_information: &DiagnosticInformation) {
+    let DiagnosticInformation {
+        cfg_size,
+        cache_trailing_bits_size,
+        cache8_size,
+        cache32_size,
+        cache_32bit_hit_count,
+        cache_8bit_hit_count,
+        cache_trailing_bits_hit_count,
+        cache_missed_bit_count,
+    } = &diagnostic_information;
+    log::info!(
+        "After analyzer, CFG size {cfg_size}, \
+        trailing bits cache size {cache_trailing_bits_size}, \
+        8bit cache size {cache8_size}, \
+        32bit cache size {cache32_size}, \
+        trailing bits cache hit count {cache_trailing_bits_hit_count}, \
+        8bit cache hit count {cache_8bit_hit_count}, \
+        32bit cache hit count {cache_32bit_hit_count}, \
+        missed cache count {cache_missed_bit_count}"
+    );
 }
