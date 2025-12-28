@@ -29,7 +29,7 @@ pub struct DiagnosticInformation {
     pub cache_missed_bit_count: usize,
 }
 
-impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
+impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
     /// Get diagnostic information
     #[must_use]
     pub fn diagnose(&self) -> DiagnosticInformation {

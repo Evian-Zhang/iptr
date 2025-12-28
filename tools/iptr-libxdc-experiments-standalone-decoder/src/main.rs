@@ -33,10 +33,10 @@ fn main() -> Result<()> {
         round,
     } = Cmdline::parse();
 
-    let mut memory_reader =
+    let memory_reader =
         MemoryReader::new(&page_dump, &page_addr).context("Failed to create memory reader")?;
-    let mut control_flow_handler = FuzzBitmapControlFlowHandler::default();
-    let edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
+    let control_flow_handler = FuzzBitmapControlFlowHandler::default();
+    let edge_analyzer = EdgeAnalyzer::new(control_flow_handler, memory_reader);
     #[cfg(feature = "debug")]
     let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(
         iptr_decoder::packet_handler::log::PacketHandlerRawLogger::default(),

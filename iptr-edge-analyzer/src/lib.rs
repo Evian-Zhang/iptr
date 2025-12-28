@@ -1,5 +1,5 @@
 mod control_flow_cache;
-mod control_flow_handler;
+pub mod control_flow_handler;
 mod diagnose;
 pub mod error;
 mod memory_reader;
@@ -75,7 +75,7 @@ enum PreTipStatus {
 /// The analyzer will trace the control flow during the Intel PT packets, and invoke
 /// corresponding callbacks in the given control flow handler that implements
 /// [`HandleControlFlow`].
-pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
+pub struct EdgeAnalyzer<H: HandleControlFlow, R: ReadMemory> {
     /// IP-reconstruction-specific field.
     ///
     /// This is not always be the last IP in the packet. It has
@@ -115,15 +115,15 @@ pub struct EdgeAnalyzer<'a, H: HandleControlFlow, R: ReadMemory> {
     #[cfg(all(feature = "cache", feature = "more_diagnose"))]
     cache_missed_bit_count: usize,
     /// Passed control flow handler
-    handler: &'a mut H,
+    handler: H,
     /// Passed memory reader
-    reader: &'a mut R,
+    reader: R,
 }
 
-impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
+impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
     /// Create a new edge analyzer
     #[must_use]
-    pub fn new(handler: &'a mut H, reader: &'a mut R) -> Self {
+    pub fn new(handler: H, reader: R) -> Self {
         Self {
             last_ip: 0,
             last_bb: None,
@@ -143,6 +143,18 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             handler,
             reader,
         }
+    }
+
+    pub fn into_handler_and_reader(self) -> (H, R) {
+        (self.handler, self.reader)
+    }
+
+    pub fn handler(&mut self) -> &mut H {
+        &mut self.handler
+    }
+
+    pub fn reader(&mut self) -> &mut R {
+        &mut self.reader
     }
 
     /// Perform IP reconstruction and update the `last_ip` field,
@@ -196,72 +208,42 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         context: &DecoderContext,
         last_bb_ref: &mut u64,
         is_taken: bool,
-    ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
+        cache: bool,
+    ) -> AnalyzerResult<TntProceed, H, R> {
         #[cfg(all(feature = "cache", feature = "more_diagnose"))]
         {
             self.cache_missed_bit_count += 1;
         }
         let mut last_bb = *last_bb_ref;
-        #[cfg(feature = "cache")]
-        let mut cached_key = None;
-        #[cfg(not(feature = "cache"))]
-        let cached_key = None;
         let tnt_proceed;
         'cfg_traverse: loop {
             let cfg_node =
                 self.static_analyzer
-                    .resolve(self.reader, context.tracee_mode(), last_bb)?;
+                    .resolve(&mut self.reader, context.tracee_mode(), last_bb)?;
             let terminator = cfg_node.terminator;
             use static_analyzer::CfgTerminator::*;
             match terminator {
                 Branch { r#true, r#false } => {
                     let r#false = r#false as u64 | (r#true & 0xFFFF_FFFF_0000_0000);
                     last_bb = if is_taken { r#true } else { r#false };
-                    let new_cached_key = self
-                        .handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch)
+                    self.handler
+                        .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch, cache)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    #[cfg(feature = "cache")]
-                    control_flow_cache::update_cached_key(
-                        self.handler,
-                        &mut cached_key,
-                        new_cached_key,
-                    )?;
-                    #[cfg(not(feature = "cache"))]
-                    let _ = new_cached_key;
                     tnt_proceed = TntProceed::Continue;
                     break 'cfg_traverse;
                 }
                 DirectGoto { target } => {
                     last_bb = target;
-                    let new_cached_key = self
-                        .handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
+                    self.handler
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, cache)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    #[cfg(feature = "cache")]
-                    control_flow_cache::update_cached_key(
-                        self.handler,
-                        &mut cached_key,
-                        new_cached_key,
-                    )?;
-                    #[cfg(not(feature = "cache"))]
-                    let _ = new_cached_key;
                     continue 'cfg_traverse;
                 }
                 DirectCall { target } => {
                     last_bb = target;
-                    let new_cached_key = self
-                        .handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
+                    self.handler
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, cache)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    #[cfg(feature = "cache")]
-                    control_flow_cache::update_cached_key(
-                        self.handler,
-                        &mut cached_key,
-                        new_cached_key,
-                    )?;
-                    #[cfg(not(feature = "cache"))]
-                    let _ = new_cached_key;
                     continue 'cfg_traverse;
                 }
                 IndirectGoto => {
@@ -302,7 +284,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         }
         *last_bb_ref = last_bb;
 
-        Ok((cached_key, tnt_proceed))
+        Ok(tnt_proceed)
     }
 
     /// Determine the status of the next TIP packet.
@@ -325,7 +307,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
         'cfg_traverse: loop {
             let cfg_node =
                 self.static_analyzer
-                    .resolve(self.reader, context.tracee_mode(), last_bb)?;
+                    .resolve(&mut self.reader, context.tracee_mode(), last_bb)?;
             let terminator = cfg_node.terminator;
             use static_analyzer::CfgTerminator::*;
             match terminator {
@@ -337,7 +319,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     last_bb = target;
                     let _new_cached_key = self
                         .handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump)
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, false)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
@@ -345,7 +327,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
                     last_bb = target;
                     let _new_cached_key = self
                         .handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall)
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, false)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
@@ -434,34 +416,34 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
             PreTipStatus::Normal => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
             PreTipStatus::PendingReturn => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::Return)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::Return, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectGoto => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectJump)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectJump, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectCall => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectCall)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectCall, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFarTransfer => {
                 let _new_cached_key = self
                     .handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
@@ -480,7 +462,7 @@ impl<'a, H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'a, H, R> {
     }
 }
 
-impl<H, R> HandlePacket for EdgeAnalyzer<'_, H, R>
+impl<H, R> HandlePacket for EdgeAnalyzer<H, R>
 where
     H: HandleControlFlow,
     R: ReadMemory,
@@ -596,7 +578,7 @@ where
             self.tnt_buffer_manager.clear();
             let _new_cached_key = self
                 .handler
-                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock, false)
                 .map_err(AnalyzerError::ControlFlowHandler)?;
             return Ok(());
         }
@@ -604,7 +586,7 @@ where
             self.last_bb = NonZero::new(last_bb);
             let _new_cached_key = self
                 .handler
-                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock)
+                .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock, false)
                 .map_err(AnalyzerError::ControlFlowHandler)?;
         }
         self.pre_tip_status = PreTipStatus::Normal;

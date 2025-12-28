@@ -15,19 +15,20 @@ impl HandleControlFlow for FuzzBitmapControlFlowHandler {
         &mut self,
         _block_addr: u64,
         _transition_kind: ControlFlowTransitionKind,
-    ) -> Result<Option<Self::CachedKey>, Self::Error> {
-        Ok(None)
-    }
-
-    fn on_reused_cache(&mut self, _cached_key: &Self::CachedKey) -> Result<(), Self::Error> {
+        _cache: bool,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn merge_cached_keys(
-        &mut self,
-        _cached_key1: Self::CachedKey,
-        _cached_key2: Self::CachedKey,
-    ) -> Result<Self::CachedKey, Self::Error> {
+    fn on_reusing_cached_key(&mut self, _cached_key: Self::CachedKey) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn take_cache(&mut self) -> Result<Option<Self::CachedKey>, Self::Error> {
+        Ok(Some(()))
+    }
+
+    fn on_reused_cache(&mut self, _cached_key: &Self::CachedKey) -> Result<(), Self::Error> {
         Ok(())
     }
 }

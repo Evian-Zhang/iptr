@@ -18,7 +18,7 @@ use crate::{
     tnt_buffer::TntBuffer,
 };
 
-impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
+impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
     /// Indicate that we have encountered a deferred TIP.
     ///
     /// This will re-inject the remaining TNT buffer, and set the [`pre_tip_status`][Self::pre_tip_status].
@@ -191,14 +191,16 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
 
         #[cfg(feature = "cache")]
         {
-            let mut cached_key = None;
+            // Here we make sure handler's cache has already been cleared
             for new_cached_key in cached_keys {
                 // SAFETY: All cached keys are written
-                update_cached_key(self.handler, &mut cached_key, unsafe {
-                    new_cached_key.assume_init()
-                })?;
+                update_cached_key(&mut self.handler, unsafe { new_cached_key.assume_init() })?;
             }
             // The cache will only be inserted if `TntProceed` is always `Continue`
+            let cached_key = self
+                .handler
+                .take_cache()
+                .map_err(AnalyzerError::ControlFlowHandler)?;
             self.cache_manager.insert_dword(
                 start_bb,
                 tnt_buffer,
@@ -256,13 +258,12 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
             // and `Cow` structure.
             return Ok((cached_info.user_data.clone(), TntProceed::Continue));
         }
-        let mut cached_keys = [const { MaybeUninit::uninit() }; 8];
         let start_bb = *last_bb_ref;
         // The default value does not matter. The for-loop must run at least once
         for bit in (0..8).rev() {
             let tnt_bit = (tnt_bits & (1 << bit)) != 0;
-            let (new_cached_key, tnt_proceed) =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
+            let tnt_proceed =
+                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit, true)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
                 pre_tip_status,
@@ -277,16 +278,13 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                     },
                 ));
             }
-            cached_keys[(7 - bit) as usize].write(new_cached_key);
         }
         #[cfg(feature = "cache")]
         {
-            let mut cached_key = None;
-            for new_cached_key in cached_keys {
-                // SAFETY: All elements are written
-                let new_cached_key = unsafe { new_cached_key.assume_init() };
-                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-            }
+            let cached_key = self
+                .handler
+                .take_cache()
+                .map_err(AnalyzerError::ControlFlowHandler)?;
             // The cache will only be inserted if `TntProceed` is always `Continue`
             self.cache_manager.insert_byte(
                 start_bb,
@@ -335,12 +333,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
 
             return Ok(TntProceed::Continue);
         }
-        let mut cached_keys = [const { MaybeUninit::uninit() }; 8];
         let start_bb = *last_bb_ref;
         for bit in (0..remain_bits).rev() {
             let tnt_bit = (remain_tnt_buffer & (1 << 31)) != 0;
-            let (new_cached_key, tnt_proceed) =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit)?;
+            let tnt_proceed =
+                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit, true)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
                 pre_tip_status,
@@ -353,22 +350,19 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
                 });
             }
             remain_tnt_buffer <<= 1;
-            cached_keys[(remain_bits - bit - 1) as usize].write(new_cached_key);
         }
         #[cfg(feature = "cache")]
         {
-            let mut cached_key = None;
-            for new_cached_key in cached_keys.into_iter().take(remain_bits as usize) {
-                // SAFETY: All elements are written
-                let new_cached_key = unsafe { new_cached_key.assume_init() };
-                update_cached_key(self.handler, &mut cached_key, new_cached_key)?;
-            }
             // The cache will only be inserted if `TntProceed` is always `Continue`
+            let cached_key = self
+                .handler
+                .take_cache()
+                .map_err(AnalyzerError::ControlFlowHandler)?;
             self.cache_manager.insert_trailing_bits(
                 start_bb,
                 trailing_bits,
                 CachableInformation {
-                    user_data: cached_key.clone(),
+                    user_data: cached_key,
                     new_bb: *last_bb_ref,
                 },
             );
@@ -387,21 +381,13 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<'_, H, R> {
 #[cfg(feature = "cache")]
 pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
     handler: &mut H,
-    cached_key: &mut Option<H::CachedKey>,
     new_cached_key: Option<H::CachedKey>,
 ) -> Result<(), AnalyzerError<H, R>> {
     let Some(new_cached_key) = new_cached_key else {
         return Ok(());
     };
-    if let Some(old_cached_key) = cached_key.take() {
-        *cached_key = Some(
-            handler
-                .merge_cached_keys(old_cached_key, new_cached_key)
-                .map_err(AnalyzerError::ControlFlowHandler)?,
-        );
-    } else {
-        *cached_key = Some(new_cached_key);
-    }
-
+    handler
+        .on_reusing_cached_key(new_cached_key)
+        .map_err(AnalyzerError::ControlFlowHandler)?;
     Ok(())
 }

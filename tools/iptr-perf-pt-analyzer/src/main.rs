@@ -31,10 +31,10 @@ fn main() -> Result<()> {
         iptr_perf_pt_reader::extract_pt_auxtraces_and_mmap_data(&buf)
             .context("Failed to parse perf.data format")?;
 
-    let mut control_flow_handler = control_flow_handler::PerfAnalyzerControlFlowHandler::default();
-    let mut memory_reader = PerfMmapBasedMemoryReader::new(&mmap2_headers);
+    let control_flow_handler = control_flow_handler::PerfAnalyzerControlFlowHandler::default();
+    let memory_reader = PerfMmapBasedMemoryReader::new(&mmap2_headers);
 
-    let edge_analyzer = EdgeAnalyzer::new(&mut control_flow_handler, &mut memory_reader);
+    let edge_analyzer = EdgeAnalyzer::new(control_flow_handler, memory_reader);
     #[cfg(feature = "debug")]
     let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(
         iptr_decoder::packet_handler::log::PacketHandlerRawLogger::default(),

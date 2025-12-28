@@ -1,3 +1,5 @@
+mod fuzz_bitmap;
+
 /// Kind of control flow transitions
 #[derive(Debug)]
 pub enum ControlFlowTransitionKind {
@@ -41,22 +43,21 @@ pub trait HandleControlFlow {
 
     /// Callback when a new basic block is met.
     ///
-    /// If the new block is not important, you can return [`None`] for cached key.
+    /// Suggest marking `#[inline]` on the implementation
     fn on_new_block(
         &mut self,
         block_addr: u64,
         transition_kind: ControlFlowTransitionKind,
-    ) -> Result<Option<Self::CachedKey>, Self::Error>;
-
-    /// Callback when a given cached key is being reused.
-    fn on_reused_cache(&mut self, cached_key: &Self::CachedKey) -> Result<(), Self::Error>;
+        cache: bool,
+    ) -> Result<(), Self::Error>;
 
     /// Merge two cached key into a new cached key.
     ///
     /// This is used when we merge two continuous cache into one longer cache.
-    fn merge_cached_keys(
-        &mut self,
-        cached_key1: Self::CachedKey,
-        cached_key2: Self::CachedKey,
-    ) -> Result<Self::CachedKey, Self::Error>;
+    fn on_reusing_cached_key(&mut self, cached_key: Self::CachedKey) -> Result<(), Self::Error>;
+
+    fn take_cache(&mut self) -> Result<Option<Self::CachedKey>, Self::Error>;
+
+    /// Callback when a given cached key is being reused.
+    fn on_reused_cache(&mut self, cached_key: &Self::CachedKey) -> Result<(), Self::Error>;
 }
