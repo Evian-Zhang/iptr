@@ -1,16 +1,12 @@
 //! This module contains the core definition of [`HandleControlFlow`] trait,
-//! and several implementors like [`FuzzBitmapControlFlowHandler`].
+//! and several implementors like [`FuzzBitmapControlFlowHandler`][fuzz_bitmap::FuzzBitmapControlFlowHandler].
 
+pub mod combined;
 #[cfg(feature = "fuzz_bitmap")]
-mod fuzz_bitmap;
-
-#[cfg(all(feature = "fuzz_bitmap", feature = "cache"))]
-pub use fuzz_bitmap::PerCacheBitmapEntries;
-#[cfg(feature = "fuzz_bitmap")]
-pub use fuzz_bitmap::{FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation};
+pub mod fuzz_bitmap;
 
 /// Kind of control flow transitions
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ControlFlowTransitionKind {
     /// Conditional Jcc
     ConditionalBranch,
@@ -35,7 +31,8 @@ pub enum ControlFlowTransitionKind {
 
 /// Control flow handler used for [`EdgeAnalyzer`][crate::EdgeAnalyzer]
 ///
-/// There are several implementors provided in this crate, such as [`FuzzBitmapControlFlowHandler`].
+/// There are several implementors provided in this crate, such as
+/// [`FuzzBitmapControlFlowHandler`][fuzz_bitmap::FuzzBitmapControlFlowHandler].
 ///
 /// The overall workflow when using this trait is like:
 /// 1. Creating a new handler.

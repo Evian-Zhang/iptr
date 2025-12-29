@@ -7,7 +7,9 @@ use clap::Parser;
 use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::{
     DiagnosticInformation, EdgeAnalyzer,
-    control_flow_handler::{FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation},
+    control_flow_handler::fuzz_bitmap::{
+        FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation,
+    },
 };
 
 use crate::memory_reader::MemoryReader;

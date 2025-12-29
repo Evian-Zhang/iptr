@@ -39,6 +39,26 @@ where
     pub fn into_inner(self) -> (H1, H2) {
         (self.handler1, self.handler2)
     }
+
+    /// Get shared reference to handler1
+    pub fn handler1(&self) -> &H1 {
+        &self.handler1
+    }
+
+    /// Get unique reference to handler1
+    pub fn handler1_mut(&mut self) -> &mut H1 {
+        &mut self.handler1
+    }
+
+    /// Get shared reference to handler2
+    pub fn handler2(&self) -> &H2 {
+        &self.handler2
+    }
+
+    /// Get unique reference to handler2
+    pub fn handler2_mut(&mut self) -> &mut H2 {
+        &mut self.handler2
+    }
 }
 
 /// Error for [`CombinedPacketHandler`]
