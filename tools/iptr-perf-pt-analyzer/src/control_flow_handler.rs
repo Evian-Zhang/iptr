@@ -20,7 +20,7 @@ impl HandleControlFlow for PerfAnalyzerControlFlowHandler {
         Ok(())
     }
 
-    fn on_prev_cached_key(&mut self, _cached_key: Self::CachedKey) -> Result<(), Self::Error> {
+    fn cache_prev_cached_key(&mut self, _cached_key: Self::CachedKey) -> Result<(), Self::Error> {
         Ok(())
     }
 

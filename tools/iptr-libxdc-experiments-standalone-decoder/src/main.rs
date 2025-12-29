@@ -6,8 +6,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::{
-    DiagnosticInformation, EdgeAnalyzer,
-    control_flow_handler::fuzz_bitmap::FuzzBitmapControlFlowHandler,
+    DiagnosticInformation, EdgeAnalyzer, control_flow_handler::FuzzBitmapControlFlowHandler,
 };
 
 use crate::memory_reader::MemoryReader;

@@ -145,15 +145,28 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         }
     }
 
+    /// Consume the total structure and return the ownership of handler and reader
     pub fn into_handler_and_reader(self) -> (H, R) {
         (self.handler, self.reader)
     }
 
-    pub fn handler(&mut self) -> &mut H {
+    /// Get shared reference to control flow handler
+    pub fn handler(&self) -> &H {
+        &self.handler
+    }
+
+    /// Get shared reference to memory reader
+    pub fn reader(&self) -> &R {
+        &self.reader
+    }
+
+    /// Get unique reference to control flow handler
+    pub fn handler_mut(&mut self) -> &mut H {
         &mut self.handler
     }
 
-    pub fn reader(&mut self) -> &mut R {
+    /// Get unique reference to memory reader
+    pub fn reader_mut(&mut self) -> &mut R {
         &mut self.reader
     }
 
@@ -317,16 +330,14 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                 }
                 DirectGoto { target } => {
                     last_bb = target;
-                    let _new_cached_key = self
-                        .handler
+                    self.handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, false)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
                 DirectCall { target } => {
                     last_bb = target;
-                    let _new_cached_key = self
-                        .handler
+                    self.handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, false)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
@@ -414,35 +425,30 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         self.last_bb = NonZero::new(new_last_bb);
         match self.pre_tip_status {
             PreTipStatus::Normal => {
-                let _new_cached_key = self
-                    .handler
+                self.handler
                     .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
             PreTipStatus::PendingReturn => {
-                let _new_cached_key = self
-                    .handler
+                self.handler
                     .on_new_block(new_last_bb, ControlFlowTransitionKind::Return, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectGoto => {
-                let _new_cached_key = self
-                    .handler
+                self.handler
                     .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectJump, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingIndirectCall => {
-                let _new_cached_key = self
-                    .handler
+                self.handler
                     .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectCall, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFarTransfer => {
-                let _new_cached_key = self
-                    .handler
+                self.handler
                     .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
@@ -576,16 +582,14 @@ where
             self.last_bb = NonZero::new(last_bb);
             self.pre_tip_status = PreTipStatus::Normal;
             self.tnt_buffer_manager.clear();
-            let _new_cached_key = self
-                .handler
+            self.handler
                 .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock, false)
                 .map_err(AnalyzerError::ControlFlowHandler)?;
             return Ok(());
         }
         if let Some(last_bb) = self.reconstruct_ip_and_update_last(ip_reconstruction_pattern) {
             self.last_bb = NonZero::new(last_bb);
-            let _new_cached_key = self
-                .handler
+            self.handler
                 .on_new_block(last_bb, ControlFlowTransitionKind::NewBlock, false)
                 .map_err(AnalyzerError::ControlFlowHandler)?;
         }

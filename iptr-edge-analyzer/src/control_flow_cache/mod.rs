@@ -18,6 +18,11 @@ use crate::{
     tnt_buffer::TntBuffer,
 };
 
+#[cfg(feature = "cache")]
+type CachedKey<H> = <H as HandleControlFlow>::CachedKey;
+#[cfg(not(feature = "cache"))]
+type CachedKey<H> = std::marker::PhantomData<H>;
+
 impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
     /// Indicate that we have encountered a deferred TIP.
     ///
@@ -240,7 +245,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         context: &DecoderContext,
         last_bb_ref: &mut u64,
         tnt_bits: u8,
-    ) -> AnalyzerResult<(Option<H::CachedKey>, TntProceed), H, R> {
+    ) -> AnalyzerResult<(Option<CachedKey<H>>, TntProceed), H, R> {
         #[cfg(feature = "cache")]
         if let Some(cached_info) = self.cache_manager.get_byte(*last_bb_ref, tnt_bits) {
             #[cfg(feature = "more_diagnose")]
@@ -299,7 +304,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         #[cfg(not(feature = "cache"))]
         {
             let _ = start_bb;
-            let _ = cached_keys;
             Ok((None, TntProceed::Continue))
         }
     }
@@ -371,7 +375,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         #[cfg(not(feature = "cache"))]
         {
             let _ = start_bb;
-            let _ = cached_keys;
             Ok(TntProceed::Continue)
         }
     }
@@ -387,7 +390,7 @@ pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
         return Ok(());
     };
     handler
-        .on_prev_cached_key(new_cached_key)
+        .cache_prev_cached_key(new_cached_key)
         .map_err(AnalyzerError::ControlFlowHandler)?;
     Ok(())
 }
