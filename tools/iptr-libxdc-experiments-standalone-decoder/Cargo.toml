@@ -16,7 +16,7 @@ debug = [
 
 [dependencies]
 iptr-decoder = { workspace = true }
-iptr-edge-analyzer = { workspace = true, features = ["more_diagnose"] }
+iptr-edge-analyzer = { workspace = true, features = ["more_diagnose", "fuzz_bitmap"] }
 clap = { workspace = true, features = ["derive"] }
 memmap2 = { workspace = true }
 thiserror = { workspace = true }

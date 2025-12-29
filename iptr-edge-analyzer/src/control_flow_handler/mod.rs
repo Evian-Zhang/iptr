@@ -1,4 +1,5 @@
-mod fuzz_bitmap;
+#[cfg(feature = "fuzz_bitmap")]
+pub mod fuzz_bitmap;
 
 /// Kind of control flow transitions
 #[derive(Debug)]
@@ -54,10 +55,14 @@ pub trait HandleControlFlow {
     /// Merge two cached key into a new cached key.
     ///
     /// This is used when we merge two continuous cache into one longer cache.
-    fn on_reusing_cached_key(&mut self, cached_key: Self::CachedKey) -> Result<(), Self::Error>;
+    fn on_prev_cached_key(&mut self, cached_key: Self::CachedKey) -> Result<(), Self::Error>;
 
     fn take_cache(&mut self) -> Result<Option<Self::CachedKey>, Self::Error>;
 
     /// Callback when a given cached key is being reused.
-    fn on_reused_cache(&mut self, cached_key: &Self::CachedKey) -> Result<(), Self::Error>;
+    fn on_reused_cache(
+        &mut self,
+        cached_key: &Self::CachedKey,
+        new_bb: u64,
+    ) -> Result<(), Self::Error>;
 }

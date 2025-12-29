@@ -20,7 +20,7 @@ impl HandleControlFlow for PerfAnalyzerControlFlowHandler {
         Ok(())
     }
 
-    fn on_reusing_cached_key(&mut self, _cached_key: Self::CachedKey) -> Result<(), Self::Error> {
+    fn on_prev_cached_key(&mut self, _cached_key: Self::CachedKey) -> Result<(), Self::Error> {
         Ok(())
     }
 
@@ -28,7 +28,11 @@ impl HandleControlFlow for PerfAnalyzerControlFlowHandler {
         Ok(Some(()))
     }
 
-    fn on_reused_cache(&mut self, _cached_key: &Self::CachedKey) -> Result<(), Self::Error> {
+    fn on_reused_cache(
+        &mut self,
+        _cached_key: &Self::CachedKey,
+        _new_bb: u64,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
 }

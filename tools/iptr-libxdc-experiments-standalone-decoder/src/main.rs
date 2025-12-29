@@ -1,4 +1,3 @@
-mod control_flow_handler;
 mod memory_reader;
 
 use std::{fs::File, path::PathBuf, time::Instant};
@@ -6,9 +5,12 @@ use std::{fs::File, path::PathBuf, time::Instant};
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
-use iptr_edge_analyzer::{DiagnosticInformation, EdgeAnalyzer};
+use iptr_edge_analyzer::{
+    DiagnosticInformation, EdgeAnalyzer,
+    control_flow_handler::fuzz_bitmap::FuzzBitmapControlFlowHandler,
+};
 
-use crate::{control_flow_handler::FuzzBitmapControlFlowHandler, memory_reader::MemoryReader};
+use crate::memory_reader::MemoryReader;
 
 #[derive(Parser)]
 struct Cmdline {
@@ -33,9 +35,11 @@ fn main() -> Result<()> {
         round,
     } = Cmdline::parse();
 
+    let mut bitmap = vec![0u8; 0x10000].into_boxed_slice();
+
     let memory_reader =
         MemoryReader::new(&page_dump, &page_addr).context("Failed to create memory reader")?;
-    let control_flow_handler = FuzzBitmapControlFlowHandler::default();
+    let control_flow_handler = FuzzBitmapControlFlowHandler::new(bitmap.as_mut());
     let edge_analyzer = EdgeAnalyzer::new(control_flow_handler, memory_reader);
     #[cfg(feature = "debug")]
     let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(

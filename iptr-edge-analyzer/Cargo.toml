@@ -19,6 +19,7 @@ cache = []
 ## structure. These information would impose a little performance
 ## overhead, but is very useful for debugging.
 more_diagnose = []
+fuzz_bitmap = []
 
 [lints]
 workspace = true

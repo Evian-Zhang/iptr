@@ -131,7 +131,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
-                    .on_reused_cache(cached_key)
+                    .on_reused_cache(cached_key, cached_info.new_bb)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
 
@@ -250,7 +250,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
-                    .on_reused_cache(cached_key)
+                    .on_reused_cache(cached_key, cached_info.new_bb)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
 
@@ -327,7 +327,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             *last_bb_ref = cached_info.new_bb;
             if let Some(cached_key) = &cached_info.user_data {
                 self.handler
-                    .on_reused_cache(cached_key)
+                    .on_reused_cache(cached_key, cached_info.new_bb)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
             }
 
@@ -387,7 +387,7 @@ pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
         return Ok(());
     };
     handler
-        .on_reusing_cached_key(new_cached_key)
+        .on_prev_cached_key(new_cached_key)
         .map_err(AnalyzerError::ControlFlowHandler)?;
     Ok(())
 }
