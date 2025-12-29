@@ -133,6 +133,18 @@ where
     }
 
     #[cfg(feature = "cache")]
+    fn clear_current_cache(&mut self) -> Result<(), Self::Error> {
+        self.handler1
+            .clear_current_cache()
+            .map_err(CombinedError::H1Error)?;
+        self.handler2
+            .clear_current_cache()
+            .map_err(CombinedError::H2Error)?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "cache")]
     fn on_reused_cache(
         &mut self,
         (cached_key1, cached_key2): &Self::CachedKey,

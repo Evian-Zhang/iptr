@@ -24,6 +24,8 @@ struct Cmdline {
     page_addr: PathBuf,
     #[arg(long)]
     round: Option<usize>,
+    #[arg(long)]
+    bitmap_output: Option<PathBuf>,
 }
 
 #[expect(clippy::cast_precision_loss)]
@@ -35,6 +37,7 @@ fn main() -> Result<()> {
         page_dump,
         page_addr,
         round,
+        bitmap_output,
     } = Cmdline::parse();
 
     let mut bitmap = vec![0u8; 0x10000].into_boxed_slice();
@@ -95,6 +98,11 @@ fn main() -> Result<()> {
             &packet_handler.diagnose(),
             &packet_handler.handler().diagnose(),
         );
+
+        drop(packet_handler);
+        if let Some(bitmap_output) = bitmap_output {
+            std::fs::write(bitmap_output, &bitmap)?;
+        }
     }
 
     Ok(())

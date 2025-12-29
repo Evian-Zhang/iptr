@@ -43,9 +43,9 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
     /// Create a new fuzz bitmap control flow handler.
     ///
     /// You can pass things like `&mut [u8]`, `Vec<u8>`, `Box<[u8]>`, or even a mmaped structure.
-    pub fn new(fuzz_bitmap: M) -> Self {
+    pub fn new(fuzzing_bitmap: M) -> Self {
         #[cfg(feature = "cache")]
-        let bitmap_size = fuzz_bitmap.as_ref().len();
+        let bitmap_size = fuzzing_bitmap.as_ref().len();
         #[cfg(feature = "cache")]
         let mut bitmap_entries_arena = Vec::with_capacity(INITIAL_BITMAP_ENTRIES_ARENA_SIZE);
         #[cfg(feature = "cache")]
@@ -57,7 +57,7 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
             per_cache_bitmap: vec![0u8; bitmap_size].into_boxed_slice(),
             #[cfg(feature = "cache")]
             bitmap_entries_arena,
-            fuzzing_bitmap: fuzz_bitmap,
+            fuzzing_bitmap,
             prev_loc: 0,
         }
     }
@@ -106,13 +106,7 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
     fn at_decode_begin(&mut self) -> Result<(), Self::Error> {
         self.prev_loc = 0;
         #[cfg(feature = "cache")]
-        for bitmap_index in self.per_cache_recorded_bitmap_indices.drain(..) {
-            let bitmap_index = bitmap_index as usize;
-            // SAFETY: bitmap index is caculated by modulo
-            debug_assert!(bitmap_index < self.per_cache_bitmap.len(), "Unexpected OOB");
-            let count = unsafe { self.per_cache_bitmap.get_unchecked_mut(bitmap_index) };
-            *count = 0;
-        }
+        self.clear_current_cache();
         Ok(())
     }
 
@@ -181,6 +175,18 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             *count = count.wrapping_add(bitmap_entry.bitmap_count());
         }
 
+        Ok(())
+    }
+
+    #[cfg(feature = "cache")]
+    fn clear_current_cache(&mut self) -> Result<(), Self::Error> {
+        for bitmap_index in self.per_cache_recorded_bitmap_indices.drain(..) {
+            let bitmap_index = bitmap_index as usize;
+            // SAFETY: bitmap index is caculated by modulo
+            debug_assert!(bitmap_index < self.per_cache_bitmap.len(), "Unexpected OOB");
+            let count = unsafe { self.per_cache_bitmap.get_unchecked_mut(bitmap_index) };
+            *count = 0;
+        }
         Ok(())
     }
 

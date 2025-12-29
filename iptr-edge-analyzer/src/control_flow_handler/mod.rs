@@ -36,13 +36,14 @@ pub enum ControlFlowTransitionKind {
 ///
 /// The overall workflow when using this trait is like:
 /// 1. Creating a new handler.
-/// 2. When a new basic block is met, call [`on_new_block`][HandleControlFlow::on_new_block].
+/// 2. Clear cache by [`clear_current_cache`][HandleControlFlow::clear_current_cache]
+/// 3. When a new basic block is met, call [`on_new_block`][HandleControlFlow::on_new_block].
 ///    This function should always deal with the impact, and deal with the cache depending on the
 ///    `cache` parameter.
-/// 3. When a previous cache is met, call [`on_reused_cache`][HandleControlFlow::on_reused_cache].
+/// 4. When a previous cache is met, call [`on_reused_cache`][HandleControlFlow::on_reused_cache].
 ///    This function should only deal with the impact.
-/// 4. Collect cache by [`take_cache`][HandleControlFlow::take_cache].
 /// 5. Optionally merge caches by [`cache_prev_cached_key`][HandleControlFlow::cache_prev_cached_key].
+/// 6. Collect cache by [`take_cache`][HandleControlFlow::take_cache].
 ///
 /// In the documentation of this trait, there are two terms: "impact" and "cache". Let's take
 /// some examples. For fuzzing, "impact" means modification of fuzzing bitmap, and "cache"
@@ -101,6 +102,13 @@ pub trait HandleControlFlow {
     /// If there is no cache, this function should return `Ok(None)`.
     #[cfg(feature = "cache")]
     fn take_cache(&mut self) -> Result<Option<Self::CachedKey>, Self::Error>;
+
+    /// Clear the cache.
+    ///
+    /// This is NOT clearing all cached information. Instead, this is
+    /// to clear current temporary cache.
+    #[cfg(feature = "cache")]
+    fn clear_current_cache(&mut self) -> Result<(), Self::Error>;
 
     /// Callback when a given cached key is being reused.
     ///

@@ -28,6 +28,10 @@ impl HandleControlFlow for PerfAnalyzerControlFlowHandler {
         Ok(Some(()))
     }
 
+    fn clear_current_cache(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
     fn on_reused_cache(
         &mut self,
         _cached_key: &Self::CachedKey,

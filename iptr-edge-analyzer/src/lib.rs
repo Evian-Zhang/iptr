@@ -216,12 +216,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         clippy::items_after_statements,
         clippy::needless_continue
     )]
-    fn process_tnt_bit_without_cache(
+    fn process_tnt_bit_without_querying_cache(
         &mut self,
         context: &DecoderContext,
         last_bb_ref: &mut u64,
         is_taken: bool,
-        cache: bool,
     ) -> AnalyzerResult<TntProceed, H, R> {
         #[cfg(all(feature = "cache", feature = "more_diagnose"))]
         {
@@ -240,7 +239,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                     let r#false = r#false as u64 | (r#true & 0xFFFF_FFFF_0000_0000);
                     last_bb = if is_taken { r#true } else { r#false };
                     self.handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch, cache)
+                        .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch, true)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     tnt_proceed = TntProceed::Continue;
                     break 'cfg_traverse;
@@ -248,14 +247,14 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                 DirectGoto { target } => {
                     last_bb = target;
                     self.handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, cache)
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, true)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
                 DirectCall { target } => {
                     last_bb = target;
                     self.handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, cache)
+                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, true)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }

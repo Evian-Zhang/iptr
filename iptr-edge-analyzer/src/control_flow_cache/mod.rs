@@ -50,7 +50,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         tnt_buffer: TntBuffer,
     ) -> AnalyzerResult<(), H, R> {
         let remain_bits = tnt_buffer.bits();
-        let round8 = (remain_bits % 32) / 8;
+        let round8 = remain_bits / 8;
         let round1 = remain_bits % 8;
         let mut remain_buffer_value = u32::from_le_bytes(tnt_buffer.get_array_dword());
         for round in 0..round8 {
@@ -197,6 +197,9 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         #[cfg(feature = "cache")]
         {
             // Here we make sure handler's cache has already been cleared
+            self.handler
+                .clear_current_cache()
+                .map_err(AnalyzerError::ControlFlowHandler)?;
             for new_cached_key in cached_keys {
                 // SAFETY: All cached keys are written
                 update_cached_key(&mut self.handler, unsafe { new_cached_key.assume_init() })?;
@@ -263,12 +266,16 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             // and `Cow` structure.
             return Ok((cached_info.user_data.clone(), TntProceed::Continue));
         }
+        #[cfg(feature = "cache")]
+        self.handler
+            .clear_current_cache()
+            .map_err(AnalyzerError::ControlFlowHandler)?;
         let start_bb = *last_bb_ref;
         // The default value does not matter. The for-loop must run at least once
         for bit in (0..8).rev() {
             let tnt_bit = (tnt_bits & (1 << bit)) != 0;
             let tnt_proceed =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit, true)?;
+                self.process_tnt_bit_without_querying_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
                 pre_tip_status,
@@ -337,11 +344,15 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
 
             return Ok(TntProceed::Continue);
         }
+        #[cfg(feature = "cache")]
+        self.handler
+            .clear_current_cache()
+            .map_err(AnalyzerError::ControlFlowHandler)?;
         let start_bb = *last_bb_ref;
         for bit in (0..remain_bits).rev() {
             let tnt_bit = (remain_tnt_buffer & (1 << 31)) != 0;
             let tnt_proceed =
-                self.process_tnt_bit_without_cache(context, last_bb_ref, tnt_bit, true)?;
+                self.process_tnt_bit_without_querying_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
                 pre_tip_status,
@@ -382,7 +393,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
 
 /// A convenient wrapper for [`merge_cached_keys`][HandleControlFlow::merge_cached_keys]
 #[cfg(feature = "cache")]
-pub(crate) fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
+fn update_cached_key<H: HandleControlFlow, R: ReadMemory>(
     handler: &mut H,
     new_cached_key: Option<H::CachedKey>,
 ) -> Result<(), AnalyzerError<H, R>> {

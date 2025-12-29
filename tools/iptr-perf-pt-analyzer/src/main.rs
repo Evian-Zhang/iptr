@@ -44,13 +44,11 @@ fn main() -> Result<()> {
     let mut packet_handler = edge_analyzer;
 
     for pt_auxtrace in pt_auxtraces {
-        if let Err(err) = iptr_decoder::decode(
+        iptr_decoder::decode(
             pt_auxtrace.auxtrace_data,
             DecodeOptions::default(),
             &mut packet_handler,
-        ) {
-            log::error!("{err:?}");
-        }
+        )?;
     }
 
     Ok(())
