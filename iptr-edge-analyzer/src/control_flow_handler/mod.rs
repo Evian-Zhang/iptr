@@ -4,10 +4,10 @@
 #[cfg(feature = "fuzz_bitmap")]
 mod fuzz_bitmap;
 
-#[cfg(feature = "fuzz_bitmap")]
-pub use fuzz_bitmap::FuzzBitmapControlFlowHandler;
 #[cfg(all(feature = "fuzz_bitmap", feature = "cache"))]
 pub use fuzz_bitmap::PerCacheBitmapEntries;
+#[cfg(feature = "fuzz_bitmap")]
+pub use fuzz_bitmap::{FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation};
 
 /// Kind of control flow transitions
 #[derive(Debug)]

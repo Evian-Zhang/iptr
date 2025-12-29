@@ -19,6 +19,8 @@ cache = []
 ## structure. These information would impose a little performance
 ## overhead, but is very useful for debugging.
 more_diagnose = []
+## Enable `HandleControlFlow` implementor fuzz bitmap control flow
+## handler.
 fuzz_bitmap = []
 
 [lints]

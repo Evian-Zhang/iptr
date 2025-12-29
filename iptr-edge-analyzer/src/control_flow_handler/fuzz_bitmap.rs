@@ -79,6 +79,23 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
     fn set_new_loc(&mut self, new_loc: u64) {
         self.prev_loc = new_loc >> 1;
     }
+
+    /// Get diagnose information
+    pub fn diagnose(&self) -> FuzzBitmapDiagnosticInformation {
+        FuzzBitmapDiagnosticInformation {
+            #[cfg(feature = "cache")]
+            bitmap_entries_count: self.bitmap_entries_arena.len(),
+        }
+    }
+}
+
+/// Diagnostic information for [`FuzzBitmapControlFlowHandler`].
+///
+/// This struct can be retrieved from [`FuzzBitmapControlFlowHandler::diagnose`]
+pub struct FuzzBitmapDiagnosticInformation {
+    /// Number of raw bitmap entries stored in cache structure
+    #[cfg(feature = "cache")]
+    pub bitmap_entries_count: usize,
 }
 
 impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHandler<M> {

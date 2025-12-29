@@ -52,3 +52,9 @@ broken_intra_doc_links = "deny"
 [profile.release]
 lto = true
 codegen-units = 1
+strip = true
+
+[profile.release-with-debug]
+inherits = "release"
+strip = "none"
+debug-assertions = true

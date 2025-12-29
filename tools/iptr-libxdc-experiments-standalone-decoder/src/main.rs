@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::{
-    DiagnosticInformation, EdgeAnalyzer, control_flow_handler::FuzzBitmapControlFlowHandler,
+    DiagnosticInformation, EdgeAnalyzer,
+    control_flow_handler::{FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation},
 };
 
 use crate::memory_reader::MemoryReader;
@@ -62,7 +63,10 @@ fn main() -> Result<()> {
         let cold_time = instant.elapsed();
         log::info!("run_time_cold = {}", cold_time.as_nanos());
         #[cfg(not(feature = "debug"))]
-        report_diagnose(&packet_handler.diagnose());
+        report_diagnose(
+            &packet_handler.diagnose(),
+            &packet_handler.handler().diagnose(),
+        );
 
         let round = round - 1;
         let mut total_time = 0;
@@ -75,21 +79,30 @@ fn main() -> Result<()> {
             log::info!("run_time = {time}");
 
             #[cfg(not(feature = "debug"))]
-            report_diagnose(&packet_handler.diagnose());
+            report_diagnose(
+                &packet_handler.diagnose(),
+                &packet_handler.handler().diagnose(),
+            );
         }
         log::info!("avg_time = {}", total_time as f64 / round as f64);
     } else {
         iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
 
         #[cfg(not(feature = "debug"))]
-        report_diagnose(&packet_handler.diagnose());
+        report_diagnose(
+            &packet_handler.diagnose(),
+            &packet_handler.handler().diagnose(),
+        );
     }
 
     Ok(())
 }
 
 #[allow(unused)]
-fn report_diagnose(diagnostic_information: &DiagnosticInformation) {
+fn report_diagnose(
+    diagnostic_information: &DiagnosticInformation,
+    fuzz_bitmap_diagnostic_information: &FuzzBitmapDiagnosticInformation,
+) {
     let DiagnosticInformation {
         cfg_size,
         cache_trailing_bits_size,
@@ -100,14 +113,23 @@ fn report_diagnose(diagnostic_information: &DiagnosticInformation) {
         cache_trailing_bits_hit_count,
         cache_missed_bit_count,
     } = &diagnostic_information;
+    let FuzzBitmapDiagnosticInformation {
+        bitmap_entries_count,
+    } = fuzz_bitmap_diagnostic_information;
     log::info!(
-        "After analyzer, CFG size {cfg_size}, \
-        trailing bits cache size {cache_trailing_bits_size}, \
-        8bit cache size {cache8_size}, \
-        32bit cache size {cache32_size}, \
-        trailing bits cache hit count {cache_trailing_bits_hit_count}, \
-        8bit cache hit count {cache_8bit_hit_count}, \
-        32bit cache hit count {cache_32bit_hit_count}, \
-        missed cache count {cache_missed_bit_count}"
+        "Analyzer diagnose statistics
+CFG size {cfg_size}
+Cache size
+\t{cache_trailing_bits_size} trailing bits
+\t{cache8_size} 8bits
+\t{cache32_size} 32bits
+Cache hitcount
+\t{cache_trailing_bits_hit_count} trailing bits
+\t{cache_8bit_hit_count} 8bits
+\t{cache_32bit_hit_count} 32bits
+\t{cache_missed_bit_count} missed
+Fuzz bitmap
+\t{bitmap_entries_count} raw bitmap entries
+    "
     );
 }
