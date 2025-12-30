@@ -75,6 +75,16 @@ pub trait HandleControlFlow {
     /// will never be folded into cache. No matter `cache` is true or false, this
     /// function should always deal with the impact of new block.
     ///
+    /// When conducting caching, it should be extremely important, that
+    /// the cached state should not be related to things BEFORE TIP packets.
+    /// Normally, a TIP packet will generate transitions including
+    /// [`NewBlock`][ControlFlowTransitionKind::NewBlock], [`Return`][ControlFlowTransitionKind::Return],
+    /// [`IndirectCall`][ControlFlowTransitionKind::IndirectCall],
+    /// [`IndirectJump`][ControlFlowTransitionKind::IndirectJump]. These
+    /// transitions are guaranteed invoked with `cache` argument with false.
+    /// When encountering this situation, you should make sure the following
+    /// caches should not depend on states before the TIP packet.
+    ///
     /// Suggest marking `#[inline]` on the implementation
     fn on_new_block(
         &mut self,
