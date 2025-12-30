@@ -14,16 +14,33 @@ use iptr_edge_analyzer::{
 
 use crate::memory_reader::MemoryReader;
 
+/// A standalone binary for libxdc-like evaluation
+///
+/// This binary implements memory reader compatible of
+/// that in libxdc_experiments.
+///
+/// Set the environment variable `RUST_LOG=trace` for logging.
 #[derive(Parser)]
 struct Cmdline {
+    /// Path to pure Intel PT data
     #[arg(short, long)]
     input: PathBuf,
+    /// Path to page dump file
     #[arg(long)]
     page_dump: PathBuf,
+    /// Path to page addr file
     #[arg(long)]
     page_addr: PathBuf,
+    /// Number of round for repeated evaluation, if given.
+    ///
+    /// If this option is not given, the evaluation will
+    /// only be repeated once
     #[arg(long)]
     round: Option<usize>,
+    /// Path for writing bitmap output, if given.
+    ///
+    /// The bitmap is initialized with all zero data with
+    /// 0x10000 size.
     #[arg(long)]
     bitmap_output: Option<PathBuf>,
 }

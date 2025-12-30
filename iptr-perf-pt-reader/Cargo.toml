@@ -23,5 +23,4 @@ memory_reader = [
 iptr-edge-analyzer = { workspace = true, optional = true }
 memmap2 = { workspace = true, optional = true }
 thiserror = { workspace = true }
-derive_more = { workspace = true, features = ["display"] }
 log = { workspace = true }

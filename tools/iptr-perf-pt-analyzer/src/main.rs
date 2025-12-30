@@ -8,12 +8,12 @@ use iptr_perf_pt_reader::memory_reader::PerfMmapBasedMemoryReader;
 
 use std::{fs::File, path::PathBuf};
 
-/// Decode target intel PT packets in the low level and logs all details.
+/// Decode the Intel PT trace with semantic validation.
 ///
 /// Set the environment variable `RUST_LOG=trace` for logging.
 #[derive(Parser)]
 struct Cmdline {
-    /// Path of intel PT trace
+    /// Path of intel PT trace in perf.data format
     #[arg(short, long)]
     input: PathBuf,
 }
