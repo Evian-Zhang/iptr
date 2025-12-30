@@ -453,6 +453,9 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                 self.pre_tip_status = PreTipStatus::Normal;
             }
             PreTipStatus::PendingFup => {
+                self.handler
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
+                    .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
                 self.tnt_buffer_manager.clear();
                 return Ok(());
