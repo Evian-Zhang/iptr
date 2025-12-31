@@ -38,6 +38,7 @@ struct Cmdline {
     ///
     /// You should pass --range-start and --range-end at
     /// the same time.
+    #[arg(long)]
     range_start: Option<String>,
     /// End address of filter range, if given.
     ///
@@ -46,6 +47,7 @@ struct Cmdline {
     ///
     /// You should pass --range-start and --range-end at
     /// the same time.
+    #[arg(long)]
     range_end: Option<String>,
     /// Number of round for repeated evaluation, if given.
     ///
