@@ -31,6 +31,22 @@ struct Cmdline {
     /// Path to page addr file
     #[arg(long)]
     page_addr: PathBuf,
+    /// Start address of filter range, if given.
+    ///
+    /// For instructions out of the filter range, the fuzzing
+    /// bitmap will not be updated.
+    ///
+    /// You should pass --range-start and --range-end at
+    /// the same time.
+    range_start: Option<String>,
+    /// End address of filter range, if given.
+    ///
+    /// For instructions out of the filter range, the fuzzing
+    /// bitmap will not be updated.
+    ///
+    /// You should pass --range-start and --range-end at
+    /// the same time.
+    range_end: Option<String>,
     /// Number of round for repeated evaluation, if given.
     ///
     /// If this option is not given, the evaluation will
@@ -53,15 +69,36 @@ fn main() -> Result<()> {
         input,
         page_dump,
         page_addr,
+        range_start,
+        range_end,
         round,
         bitmap_output,
     } = Cmdline::parse();
+
+    let range = match (range_start, range_end) {
+        (Some(start), Some(end)) => {
+            let start = start.strip_prefix("0x").unwrap_or(&start);
+            let start = u64::from_str_radix(start, 16).context("Invalid --range-start")?;
+
+            let end = end.strip_prefix("0x").unwrap_or(&end);
+            let end = u64::from_str_radix(end, 16).context("Invalid --range-start")?;
+
+            Some([(start, end)])
+        }
+        (None, None) => None,
+        _ => {
+            return Err(anyhow::anyhow!(
+                "--range-start and --range-end should be given at the same time"
+            ));
+        }
+    };
 
     let mut bitmap = vec![0u8; 0x10000].into_boxed_slice();
 
     let memory_reader =
         MemoryReader::new(&page_dump, &page_addr).context("Failed to create memory reader")?;
-    let control_flow_handler = FuzzBitmapControlFlowHandler::new(bitmap.as_mut());
+    let control_flow_handler =
+        FuzzBitmapControlFlowHandler::new(bitmap.as_mut(), range.as_ref().map(<[_; _]>::as_slice));
     let edge_analyzer = EdgeAnalyzer::new(control_flow_handler, memory_reader);
     #[cfg(feature = "debug")]
     let mut packet_handler = iptr_decoder::packet_handler::combined::CombinedPacketHandler::new(

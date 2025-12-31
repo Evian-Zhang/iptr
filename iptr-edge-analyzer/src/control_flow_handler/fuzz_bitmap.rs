@@ -28,6 +28,11 @@ pub struct FuzzBitmapControlFlowHandler<M: AsRef<[u8]> + AsMut<[u8]>> {
     bitmap_entries_arena: Vec<CompactBitmapEntry>,
     /// The fuzzing bitmap needed to be maintained.
     fuzzing_bitmap: M,
+    /// Range of valid instruction addresses, if given.
+    ///
+    /// For instruction out of the range, it will not update
+    /// hit count of fuzz bitmap.
+    filter_range: Option<Box<[(u64, u64)]>>,
     /// Previous location used to calculating fuzzing bitmap index.
     prev_loc: u64,
 }
@@ -42,8 +47,11 @@ const INITIAL_BITMAP_ENTRIES_ARENA_SIZE: usize = 0x100;
 impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
     /// Create a new fuzz bitmap control flow handler.
     ///
-    /// You can pass things like `&mut [u8]`, `Vec<u8>`, `Box<[u8]>`, or even a mmaped structure.
-    pub fn new(fuzzing_bitmap: M) -> Self {
+    /// You can pass things like `&mut [u8]`, `Vec<u8>`, `Box<[u8]>`, or even a mmaped structure
+    /// as `fuzzing_bitmap`. If you want to give range restrictions, pass `filter_range`,
+    /// or you could just pass a [`None`] here to indicate that there is no
+    /// range restrictions.
+    pub fn new(fuzzing_bitmap: M, filter_range: Option<&[(u64, u64)]>) -> Self {
         #[cfg(feature = "cache")]
         let bitmap_size = fuzzing_bitmap.as_ref().len();
         #[cfg(feature = "cache")]
@@ -57,9 +65,23 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
             per_cache_bitmap: vec![0u8; bitmap_size].into_boxed_slice(),
             #[cfg(feature = "cache")]
             bitmap_entries_arena,
+            filter_range: filter_range.map(Box::from),
             fuzzing_bitmap,
             prev_loc: 0,
         }
+    }
+
+    #[inline]
+    fn is_addr_in_filter_range(&self, address: u64) -> bool {
+        let Some(filter_range) = &self.filter_range else {
+            return true;
+        };
+        for (start, end) in filter_range {
+            if (*start..=*end).contains(&address) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Get fuzz bitmap size as a modulus for calculating bitmap index
@@ -120,6 +142,10 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
         cache: bool,
     ) -> Result<(), Self::Error> {
         use ControlFlowTransitionKind::*;
+        if !self.is_addr_in_filter_range(block_addr) {
+            self.set_new_loc(0);
+            return Ok(());
+        }
         match transition_kind {
             ConditionalBranch | IndirectJump | IndirectCall | FarTransfer | Return => {
                 let bitmap_index = self.on_new_loc(block_addr);
