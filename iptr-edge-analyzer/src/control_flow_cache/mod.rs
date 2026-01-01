@@ -27,13 +27,9 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
     /// Indicate that we have encountered a deferred TIP.
     ///
     /// This will re-inject the remaining TNT buffer, and set the [`pre_tip_status`][Self::pre_tip_status].
-    fn mark_deferred_tip(
-        &mut self,
-        remain_tnt_buffer: TntBuffer,
-        pre_tip_status: PreTipStatus,
-    ) -> AnalyzerResult<(), H, R> {
+    fn mark_deferred_tip(&mut self, remain_tnt_buffer: TntBuffer) -> AnalyzerResult<(), H, R> {
         self.tnt_buffer_manager.prepend_buf(remain_tnt_buffer)?;
-        self.pre_tip_status = pre_tip_status;
+        self.pre_tip_status = PreTipStatus::PendingIndirect;
 
         Ok(())
     }
@@ -61,12 +57,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             )?;
             if let TntProceed::Break {
                 processed_bit_count,
-                pre_tip_status,
             } = tnt_proceed
             {
                 let remain_buf =
                     tnt_buffer.remove_first_n_bits(processed_bit_count + round * u8::BITS);
-                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
+                self.mark_deferred_tip(remain_buf)?;
                 return Ok(());
             }
             remain_buffer_value <<= u8::BITS;
@@ -80,12 +75,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             )?;
             if let TntProceed::Break {
                 processed_bit_count,
-                pre_tip_status,
             } = tnt_proceed
             {
                 let remain_buf =
                     tnt_buffer.remove_first_n_bits(processed_bit_count + round8 * u8::BITS);
-                self.mark_deferred_tip(remain_buf, pre_tip_status)?;
+                self.mark_deferred_tip(remain_buf)?;
                 return Ok(());
             }
         }
@@ -105,11 +99,10 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         let tnt_proceed = self.handle_tnt_buffer32(context, last_bb_ref, [b0, b1, b2, b3])?;
         if let TntProceed::Break {
             processed_bit_count,
-            pre_tip_status,
         } = tnt_proceed
         {
             let remain_buf = tnt_buffer.remove_first_n_bits(processed_bit_count);
-            self.mark_deferred_tip(remain_buf, pre_tip_status)?;
+            self.mark_deferred_tip(remain_buf)?;
             return Ok(());
         }
 
@@ -148,48 +141,40 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b3)?;
         if let TntProceed::Break {
             processed_bit_count,
-            pre_tip_status,
         } = tnt_proceed
         {
             return Ok(TntProceed::Break {
                 processed_bit_count,
-                pre_tip_status,
             });
         }
         cached_keys[0].write(new_cached_key);
         let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b2)?;
         if let TntProceed::Break {
             processed_bit_count,
-            pre_tip_status,
         } = tnt_proceed
         {
             return Ok(TntProceed::Break {
                 processed_bit_count: processed_bit_count + u8::BITS,
-                pre_tip_status,
             });
         }
         cached_keys[1].write(new_cached_key);
         let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b1)?;
         if let TntProceed::Break {
             processed_bit_count,
-            pre_tip_status,
         } = tnt_proceed
         {
             return Ok(TntProceed::Break {
                 processed_bit_count: processed_bit_count + u8::BITS * 2,
-                pre_tip_status,
             });
         }
         cached_keys[2].write(new_cached_key);
         let (new_cached_key, tnt_proceed) = self.handle_tnt_buffer8(context, last_bb_ref, b0)?;
         if let TntProceed::Break {
             processed_bit_count,
-            pre_tip_status,
         } = tnt_proceed
         {
             return Ok(TntProceed::Break {
                 processed_bit_count: processed_bit_count + u8::BITS * 3,
-                pre_tip_status,
             });
         }
         cached_keys[3].write(new_cached_key);
@@ -278,7 +263,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                 self.process_tnt_bit_without_querying_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
-                pre_tip_status,
             } = tnt_proceed
             {
                 // Current bit is not processed, and reserved for processing after next TIP
@@ -286,7 +270,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                     None,
                     TntProceed::Break {
                         processed_bit_count: 7 - bit,
-                        pre_tip_status,
                     },
                 ));
             }
@@ -355,13 +338,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                 self.process_tnt_bit_without_querying_cache(context, last_bb_ref, tnt_bit)?;
             if let TntProceed::Break {
                 processed_bit_count: _,
-                pre_tip_status,
             } = tnt_proceed
             {
                 // Current bit is not processed, and reserved for processing after next TIP
                 return Ok(TntProceed::Break {
                     processed_bit_count: remain_bits - bit - 1,
-                    pre_tip_status,
                 });
             }
             remain_tnt_buffer <<= 1;

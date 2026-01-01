@@ -147,7 +147,7 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             return Ok(());
         }
         match transition_kind {
-            ConditionalBranch | IndirectJump | IndirectCall | FarTransfer | Return => {
+            ConditionalBranch | Indirect | DirectJump | DirectCall => {
                 let bitmap_index = self.on_new_loc(block_addr);
                 debug_assert!(
                     bitmap_index < self.fuzzing_bitmap.as_ref().len(),
@@ -173,7 +173,6 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             NewBlock => {
                 self.set_new_loc(block_addr);
             }
-            DirectJump | DirectCall => {}
         }
         Ok(())
     }

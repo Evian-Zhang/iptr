@@ -35,10 +35,6 @@ enum TntProceed {
         /// Before this deferred TIP, there are already this number
         /// of TNT bits processed.
         processed_bit_count: u32,
-        /// Reason for the deferred TIP.
-        ///
-        /// This can reduce the number of CFG resolutions.
-        pre_tip_status: PreTipStatus,
     },
 }
 
@@ -52,16 +48,8 @@ enum PreTipStatus {
     /// node is still a direct branch. In this case, no TIP packet
     /// status is forced.
     Normal,
-    /// The next CFG node is a RET instruction. Since we have
-    /// disabled return compression, the next TIP packet will always
-    /// be the return address.
-    PendingReturn,
-    /// The next CFG node is an indirect JMP instruction.
-    PendingIndirectGoto,
-    /// The next CFG node is an indirect CALL instruction.
-    PendingIndirectCall,
-    /// The next CFG node is a far transfer instruction such as SYSCALL
-    PendingFarTransfer,
+    /// The next CFG node is an indirect transition
+    PendingIndirect,
     /// There is a FUP packet before this packet. So there must be
     /// a TIP or TIP.PGD packet.
     PendingFup,
@@ -227,6 +215,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             self.cache_missed_bit_count += 1;
         }
         let mut last_bb = *last_bb_ref;
+        let mut tnt_bit_processed = false;
         let tnt_proceed;
         'cfg_traverse: loop {
             let cfg_node =
@@ -236,13 +225,18 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             use static_analyzer::CfgTerminator::*;
             match terminator {
                 Branch { r#true, r#false } => {
+                    if tnt_bit_processed {
+                        tnt_proceed = TntProceed::Continue;
+                        break 'cfg_traverse;
+                    }
                     let r#false = r#false as u64 | (r#true & 0xFFFF_FFFF_0000_0000);
                     last_bb = if is_taken { r#true } else { r#false };
                     self.handler
                         .on_new_block(last_bb, ControlFlowTransitionKind::ConditionalBranch, true)
                         .map_err(AnalyzerError::ControlFlowHandler)?;
-                    tnt_proceed = TntProceed::Continue;
-                    break 'cfg_traverse;
+                    tnt_bit_processed = true;
+                    // Continue to eat all direct goto and direct call (useful for last bit before TIP)
+                    continue 'cfg_traverse;
                 }
                 DirectGoto { target } => {
                     last_bb = target;
@@ -258,23 +252,26 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                         .map_err(AnalyzerError::ControlFlowHandler)?;
                     continue 'cfg_traverse;
                 }
-                IndirectGoto => {
+                IndirectGoto
+                | IndirectCall
+                | FarTransfers {
+                    next_instruction: _,
+                } => {
+                    if tnt_bit_processed {
+                        tnt_proceed = TntProceed::Continue;
+                        break 'cfg_traverse;
+                    }
                     // Wait for deferred TIP
                     tnt_proceed = TntProceed::Break {
                         processed_bit_count: 0,
-                        pre_tip_status: PreTipStatus::PendingIndirectGoto,
-                    };
-                    break 'cfg_traverse;
-                }
-                IndirectCall => {
-                    // Wait for deferred TIP
-                    tnt_proceed = TntProceed::Break {
-                        processed_bit_count: 0,
-                        pre_tip_status: PreTipStatus::PendingIndirectCall,
                     };
                     break 'cfg_traverse;
                 }
                 NearRet => {
+                    if tnt_bit_processed {
+                        tnt_proceed = TntProceed::Continue;
+                        break 'cfg_traverse;
+                    }
                     if !is_taken {
                         // If return is not compressed, then an immediate TIP packet will be generated.
                         // If return is compressed, then a taken bit will be generated
@@ -282,89 +279,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
                     }
                     return Err(AnalyzerError::UnsupportedReturnCompression);
                 }
-                FarTransfers {
-                    next_instruction: _,
-                } => {
-                    // Wait for deferred TIP
-                    tnt_proceed = TntProceed::Break {
-                        processed_bit_count: 0,
-                        pre_tip_status: PreTipStatus::PendingFarTransfer,
-                    };
-                    break 'cfg_traverse;
-                }
             }
         }
         *last_bb_ref = last_bb;
 
         Ok(tnt_proceed)
-    }
-
-    /// Determine the status of the next TIP packet.
-    ///
-    /// This function is invoked upon a TIP packet is arrived and current
-    /// `pre_tip_status` is just normal (which means the previous TNT bits
-    /// have not met the deferred TIP). In this case, we need to check the
-    /// last CFG node for proper control flow handler invocation.
-    #[expect(
-        clippy::enum_glob_use,
-        clippy::items_after_statements,
-        clippy::needless_continue
-    )]
-    fn determine_pre_tip_status(&mut self, context: &DecoderContext) -> AnalyzerResult<(), H, R> {
-        let Some(last_bb) = self.last_bb else {
-            // No previous instruction
-            return Ok(());
-        };
-        let mut last_bb = last_bb.get();
-        'cfg_traverse: loop {
-            let cfg_node =
-                self.static_analyzer
-                    .resolve(&mut self.reader, context.tracee_mode(), last_bb)?;
-            let terminator = cfg_node.terminator;
-            use static_analyzer::CfgTerminator::*;
-            match terminator {
-                Branch { .. } => {
-                    // It's really normal.
-                    break 'cfg_traverse;
-                }
-                DirectGoto { target } => {
-                    last_bb = target;
-                    self.handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectJump, false)
-                        .map_err(AnalyzerError::ControlFlowHandler)?;
-                    continue 'cfg_traverse;
-                }
-                DirectCall { target } => {
-                    last_bb = target;
-                    self.handler
-                        .on_new_block(last_bb, ControlFlowTransitionKind::DirectCall, false)
-                        .map_err(AnalyzerError::ControlFlowHandler)?;
-                    continue 'cfg_traverse;
-                }
-                IndirectGoto => {
-                    self.pre_tip_status = PreTipStatus::PendingIndirectGoto;
-                    break 'cfg_traverse;
-                }
-                IndirectCall => {
-                    self.pre_tip_status = PreTipStatus::PendingIndirectCall;
-                    break 'cfg_traverse;
-                }
-                NearRet => {
-                    self.pre_tip_status = PreTipStatus::PendingReturn;
-                    break 'cfg_traverse;
-                }
-                FarTransfers {
-                    next_instruction: _,
-                } => {
-                    self.pre_tip_status = PreTipStatus::PendingFarTransfer;
-                    break 'cfg_traverse;
-                }
-            }
-        }
-        // Update last bb to avoid re-invoke handler callback twice in `process_all_pending_tnts`
-        self.last_bb = NonZero::new(last_bb);
-
-        Ok(())
     }
 
     /// Process all remaining TNT bits inside tnt buffer manager
@@ -416,39 +335,11 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
             // can avoid non-deferred TIPs
             self.process_all_pending_tnts(context)?;
         }
-        // We should determine pre tip status AFTER processing all pending TNTs, since
-        // the pre tip status is determined by the last valid TNT bit.
-        if matches!(self.pre_tip_status, PreTipStatus::Normal) {
-            self.determine_pre_tip_status(context)?;
-        }
         self.last_bb = NonZero::new(new_last_bb);
         match self.pre_tip_status {
-            PreTipStatus::Normal => {
+            PreTipStatus::Normal | PreTipStatus::PendingIndirect => {
                 self.handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-            }
-            PreTipStatus::PendingReturn => {
-                self.handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::Return, false)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingIndirectGoto => {
-                self.handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectJump, false)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingIndirectCall => {
-                self.handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::IndirectCall, false)
-                    .map_err(AnalyzerError::ControlFlowHandler)?;
-                self.pre_tip_status = PreTipStatus::Normal;
-            }
-            PreTipStatus::PendingFarTransfer => {
-                self.handler
-                    .on_new_block(new_last_bb, ControlFlowTransitionKind::NewBlock, false)
+                    .on_new_block(new_last_bb, ControlFlowTransitionKind::Indirect, false)
                     .map_err(AnalyzerError::ControlFlowHandler)?;
                 self.pre_tip_status = PreTipStatus::Normal;
             }

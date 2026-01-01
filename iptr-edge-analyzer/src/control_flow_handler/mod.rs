@@ -14,14 +14,8 @@ pub enum ControlFlowTransitionKind {
     DirectJump,
     /// Direct CALL
     DirectCall,
-    /// Indirect JMP
-    IndirectJump,
-    /// Indirect CALL
-    IndirectCall,
-    /// RET
-    Return,
-    /// Far transfers
-    FarTransfer,
+    /// Indirect transition
+    Indirect,
     /// New block
     ///
     /// Basic blocks that cannot be categorized into
@@ -76,14 +70,7 @@ pub trait HandleControlFlow {
     /// function should always deal with the impact of new block.
     ///
     /// When conducting caching, it should be extremely important, that
-    /// the cached state should not be related to things BEFORE TIP packets.
-    /// Normally, a TIP packet will generate transitions including
-    /// [`NewBlock`][ControlFlowTransitionKind::NewBlock], [`Return`][ControlFlowTransitionKind::Return],
-    /// [`IndirectCall`][ControlFlowTransitionKind::IndirectCall],
-    /// [`IndirectJump`][ControlFlowTransitionKind::IndirectJump]. These
-    /// transitions are guaranteed invoked with `cache` argument with false.
-    /// When encountering this situation, you should make sure the following
-    /// caches should not depend on states before the TIP packet.
+    /// the cached state should always be consistent with `block_addr`.
     ///
     /// Suggest marking `#[inline]` on the implementation
     fn on_new_block(
