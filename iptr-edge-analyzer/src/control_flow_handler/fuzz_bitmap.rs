@@ -263,7 +263,60 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             "Unexpected OOB"
         );
         let bitmap_entries = unsafe { self.bitmap_entries_arena.get_unchecked(entries_range) };
-        for bitmap_entry in bitmap_entries {
+        let (bitmap_entries_batch, rem) = bitmap_entries.as_chunks();
+        for [entry0, entry1, entry2, entry3] in bitmap_entries_batch {
+            let bitmap_index0 = entry0.bitmap_index();
+            let bitmap_count0 = entry0.bitmap_count();
+            let bitmap_index1 = entry1.bitmap_index();
+            let bitmap_count1 = entry1.bitmap_count();
+            let bitmap_index2 = entry2.bitmap_index();
+            let bitmap_count2 = entry2.bitmap_count();
+            let bitmap_index3 = entry3.bitmap_index();
+            let bitmap_count3 = entry3.bitmap_count();
+            debug_assert!(
+                bitmap_index0 < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+            debug_assert!(
+                bitmap_index1 < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+            debug_assert!(
+                bitmap_index2 < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+            debug_assert!(
+                bitmap_index3 < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+
+            let count = unsafe {
+                self.fuzzing_bitmap
+                    .as_mut()
+                    .get_unchecked_mut(bitmap_index0)
+            };
+            *count = count.wrapping_add(bitmap_count0);
+            let count = unsafe {
+                self.fuzzing_bitmap
+                    .as_mut()
+                    .get_unchecked_mut(bitmap_index1)
+            };
+            *count = count.wrapping_add(bitmap_count1);
+            let count = unsafe {
+                self.fuzzing_bitmap
+                    .as_mut()
+                    .get_unchecked_mut(bitmap_index2)
+            };
+            *count = count.wrapping_add(bitmap_count2);
+            let count = unsafe {
+                self.fuzzing_bitmap
+                    .as_mut()
+                    .get_unchecked_mut(bitmap_index3)
+            };
+            *count = count.wrapping_add(bitmap_count3);
+        }
+
+        for bitmap_entry in rem {
             let bitmap_index = bitmap_entry.bitmap_index();
             debug_assert!(
                 bitmap_index < self.fuzzing_bitmap.as_ref().len(),
@@ -289,7 +342,7 @@ const DUMMY_BITMAP_ENTRY: CompactBitmapEntry = CompactBitmapEntry { value: 0 };
 struct CompactBitmapEntry {
     /// The actual value.
     ///
-    /// The lower 24 bits is the pos, and the upper 8 bits is the count
+    /// The upper 24 bits is the pos, and the lower 8 bits is the count
     value: u32,
 }
 
@@ -300,20 +353,21 @@ impl CompactBitmapEntry {
     #[expect(clippy::cast_possible_truncation)]
     fn new(bitmap_index: usize, bitmap_count: u8) -> Self {
         debug_assert!(bitmap_index <= 0x00FF_FFFF, "Bitmap size too large");
-        let bitmap_index = bitmap_index as u32 & 0x00FF_FFFF;
+        let bitmap_index = (bitmap_index as u32) << 8;
         Self {
-            value: bitmap_index | ((bitmap_count as u32) << 24),
+            value: bitmap_index | (bitmap_count as u32),
         }
     }
 
     /// Get the bitmap index
     fn bitmap_index(self) -> usize {
-        (self.value & 0x00FF_FFFF) as usize
+        (self.value >> 8) as usize
     }
 
     /// Get the bitmap count
+    #[expect(clippy::cast_possible_truncation)]
     fn bitmap_count(self) -> u8 {
-        (self.value >> 24) as u8
+        self.value as u8
     }
 }
 
