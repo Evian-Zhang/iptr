@@ -1,21 +1,26 @@
 //! Control flow cache structures and algorithms
 
+use zerocopy::{ByteHash, Immutable, IntoBytes};
+
 use hashbrown::HashMap;
 
 /// Key structure for the 8bit cache hash map.
-#[derive(Hash, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy, Immutable, IntoBytes)]
+#[repr(C, packed)]
 struct ControlFlowSequence8 {
     /// Absolute address starting the TNT sequences
     start_bb: u64,
     /// 8 bits TNT sequences
     cached_tnts: [u8; 1],
 }
+derive_hash_fast::derive_hash_fast_zerocopy!(ControlFlowSequence8);
 
 /// Compact representation of trailing bits
 ///
 /// The lower 8 bits are trailing bits itself (from MSB to LSB),
 /// The upper 8 bits are number of bits
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, ByteHash, Immutable, IntoBytes)]
+#[repr(C, packed)]
 pub struct TrailingBits(u16);
 
 impl TrailingBits {
@@ -35,22 +40,26 @@ impl TrailingBits {
 }
 
 /// Key structure for the 8bit cache hash map.
-#[derive(Hash, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy, Immutable, IntoBytes)]
+#[repr(C, packed)]
 struct ControlFlowSequenceTrailBits {
     /// Absolute address starting the TNT sequences
     start_bb: u64,
     /// Trailing bits
     trailing_bits: TrailingBits,
 }
+derive_hash_fast::derive_hash_fast_zerocopy!(ControlFlowSequenceTrailBits);
 
 /// Key structure for the 32bit cache hash map.
-#[derive(Hash, PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy, Immutable, IntoBytes)]
+#[repr(C, packed)]
 struct ControlFlowSequence32 {
     /// Absolute address starting the TNT sequences
     start_bb: u64,
     /// 32 bits TNT sequences
     cached_tnts: [u8; 4],
 }
+derive_hash_fast::derive_hash_fast_zerocopy!(ControlFlowSequence32);
 
 /// Value structure for the cache hash map
 pub struct CachableInformation<D> {

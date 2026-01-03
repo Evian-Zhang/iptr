@@ -1,5 +1,7 @@
 //! Handler for counting total packets
 
+use core::num::NonZero;
+
 use crate::{DecoderContext, HandlePacket, IpReconstructionPattern};
 
 /// A [`HandlePacket`] instance for counting Intel PT packets
@@ -34,7 +36,7 @@ impl HandlePacket for PacketCounter {
     fn on_short_tnt_packet(
         &mut self,
         _context: &DecoderContext,
-        _packet_byte: u8,
+        _packet_byte: NonZero<u8>,
         _highest_bit: u32,
     ) -> Result<(), Self::Error> {
         self.packet_count += 1;
@@ -45,7 +47,7 @@ impl HandlePacket for PacketCounter {
     fn on_long_tnt_packet(
         &mut self,
         _context: &DecoderContext,
-        _packet_bytes: u64,
+        _packet_bytes: NonZero<u64>,
         _highest_bit: u32,
     ) -> Result<(), Self::Error> {
         self.packet_count += 1;

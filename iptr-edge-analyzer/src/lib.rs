@@ -327,14 +327,7 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
 
         // For FUP, it flushes the CPU's internal TNT buffer, and thus we should process all
         // pending TNTs, otherwise they would just be lost.
-        if matches!(
-            self.pre_tip_status,
-            PreTipStatus::Normal | PreTipStatus::PendingFup
-        ) {
-            // This will also refresh pre_tip_status, which
-            // can avoid non-deferred TIPs
-            self.process_all_pending_tnts(context)?;
-        }
+        self.process_all_pending_tnts(context)?;
         self.last_bb = NonZero::new(new_last_bb);
         match self.pre_tip_status {
             PreTipStatus::Normal | PreTipStatus::PendingIndirect => {
@@ -394,7 +387,7 @@ where
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_byte: u8,
+        packet_byte: NonZero<u8>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         if highest_bit == 0 {
@@ -418,7 +411,7 @@ where
     fn on_long_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_bytes: u64,
+        packet_bytes: NonZero<u64>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         if highest_bit == u32::MAX {

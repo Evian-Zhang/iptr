@@ -26,6 +26,8 @@ anyhow = "1"
 memmap2 = "0.9"
 iced-x86 = "1.21"
 hashbrown = "0.16"
+zerocopy = "0.8"
+derive_hash_fast = "0.2"
 
 [workspace.package]
 version = "0.1.0"

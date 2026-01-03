@@ -1,4 +1,4 @@
-use core::hint::unreachable_unchecked;
+use core::{hint::unreachable_unchecked, num::NonZero};
 
 use derive_more::Display;
 
@@ -100,6 +100,9 @@ fn handle_short_tnt_packet<H: HandlePacket>(
     context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    // SAFETY: byte will never be zero
+    debug_assert_ne!(byte, 0, "0b0000_0000 should be PAD packet!");
+    let byte = unsafe { NonZero::new_unchecked(byte) };
     // The short TNT packets always ends with 0, so leading zeros will never be 7;
     // The 0b00000000 is PAD packet, so leading zeros will never be 8, so no need
     // to check the trailing 1

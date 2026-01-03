@@ -14,7 +14,7 @@
 //! // Use handler1 ...
 //! ```
 
-use core::convert::Infallible;
+use core::{convert::Infallible, num::NonZero};
 
 use crate::{DecoderContext, HandlePacket, IpReconstructionPattern, PtwPayload};
 
@@ -34,7 +34,7 @@ impl HandlePacket for PacketHandlerRawLogger {
     fn on_short_tnt_packet(
         &mut self,
         _context: &DecoderContext,
-        packet_byte: u8,
+        packet_byte: NonZero<u8>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         log::trace!(
@@ -46,11 +46,11 @@ impl HandlePacket for PacketHandlerRawLogger {
     fn on_long_tnt_packet(
         &mut self,
         _context: &DecoderContext,
-        packet_bytes: u64,
+        packet_bytes: NonZero<u64>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[Long TNT packet]\tpacket bytes: {packet_bytes:#066b}\thighest bit: {highest_bit}"
+            "[Long TNT packet]\tpacket bytes: {packet_bytes:#050b}\thighest bit: {highest_bit}"
         );
         Ok(())
     }

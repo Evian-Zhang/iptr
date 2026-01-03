@@ -7,6 +7,8 @@ pub mod error;
 pub mod packet_handler;
 mod raw_packet_handler;
 
+use core::num::NonZero;
+
 pub use raw_packet_handler::{level1::IpReconstructionPattern, level2::PtwPayload};
 
 use crate::error::{DecoderError, DecoderResult};
@@ -36,7 +38,7 @@ pub trait HandlePacket {
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_byte: u8,
+        packet_byte: NonZero<u8>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         Ok(())
@@ -54,7 +56,7 @@ pub trait HandlePacket {
     fn on_long_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_bytes: u64,
+        packet_bytes: NonZero<u64>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         Ok(())

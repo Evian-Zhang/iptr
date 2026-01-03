@@ -141,6 +141,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive_hash_fast"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f214c841e199688ad1d5bdeb01c880069166d9ccc71a0cede0e41d27e7e326c8"
+
+[[package]]
 name = "derive_more"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -239,11 +245,13 @@ dependencies = [
 name = "iptr-edge-analyzer"
 version = "0.1.0"
 dependencies = [
+ "derive_hash_fast",
  "hashbrown",
  "iced-x86",
  "iptr-decoder",
  "perfect-derive",
  "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
@@ -580,4 +588,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
+]
+
+[[package]]
+name = "zerocopy"
+version = "0.8.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd74ec98b9250adb3ca554bdde269adf631549f51d8a8f8f0a10b50f1cb298c3"
+dependencies = [
+ "zerocopy-derive",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.8.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a8d209fdf45cf5138cbb5a506f6b52522a25afccc534d1475dad8e31105c6a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
 ]

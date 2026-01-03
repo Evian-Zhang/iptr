@@ -1,6 +1,6 @@
 //! Handler for combining two sub handlers.
 
-use core as std; // workaround for `perfect_derive`
+use core::{self as std, num::NonZero}; // workaround for `perfect_derive`
 
 use perfect_derive::perfect_derive;
 use thiserror::Error;
@@ -98,7 +98,7 @@ where
     fn on_short_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_byte: u8,
+        packet_byte: NonZero<u8>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         self.handler1
@@ -114,7 +114,7 @@ where
     fn on_long_tnt_packet(
         &mut self,
         context: &DecoderContext,
-        packet_bytes: u64,
+        packet_bytes: NonZero<u64>,
         highest_bit: u32,
     ) -> Result<(), Self::Error> {
         self.handler1
