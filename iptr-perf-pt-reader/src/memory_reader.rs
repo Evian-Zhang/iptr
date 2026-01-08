@@ -9,9 +9,21 @@ pub struct PerfMmapBasedMemoryReader {
     entries: Vec<MmapedEntry>,
 }
 
-struct MmapedEntry {
+pub struct MmapedEntry {
     mmap: Mmap,
     virtual_address: u64,
+}
+
+impl MmapedEntry {
+    #[must_use]
+    pub fn content(&self) -> &[u8] {
+        &self.mmap
+    }
+
+    #[must_use]
+    pub fn virtual_address(&self) -> u64 {
+        self.virtual_address
+    }
 }
 
 #[derive(Debug, Error)]
@@ -21,6 +33,16 @@ pub enum PerfMmapBasedMemoryReaderError {
 }
 
 impl PerfMmapBasedMemoryReader {
+    /// Create a memory reader from mmap2 headers in perf.data.
+    ///
+    /// For headers that lead to errors, an error log will be printed,
+    /// and that header will be skipped instead of directly return error.
+    ///
+    /// To create a memory reader from perf.data, you should make sure
+    /// that all binary images involved in the process that be recorded
+    /// into perf.data are not modified and still in their original paths
+    /// (perf.data only records the mmap operation for the target process,
+    /// we use the arguments of mmap to reconstruct the target memory)
     #[expect(clippy::cast_possible_truncation)]
     #[must_use]
     pub fn new(mmap2_headers: &[PerfMmap2Header]) -> Self {
@@ -74,6 +96,14 @@ impl PerfMmapBasedMemoryReader {
         entries.sort_by_key(|entry| entry.virtual_address);
 
         Self { entries }
+    }
+
+    /// Get mmaped entries.
+    ///
+    /// The entries are guaranteed to be sorted by virtual addresses
+    #[must_use]
+    pub fn mmapped_entries(&self) -> &[MmapedEntry] {
+        &self.entries
     }
 }
 

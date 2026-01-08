@@ -1,0 +1,18 @@
+[package]
+name = "iptr-perf-memory-extractor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[dependencies]
+iptr-perf-pt-reader = { workspace = true, features = ["memory_reader"] }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+memmap2 = { workspace = true }
+
+[lints]
+workspace = true
