@@ -264,59 +264,97 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
         );
         let bitmap_entries = unsafe { self.bitmap_entries_arena.get_unchecked(entries_range) };
         let (bitmap_entries_batch, rem) = bitmap_entries.as_chunks();
-        for [entry0, entry1, entry2, entry3] in bitmap_entries_batch {
-            let bitmap_index0 = entry0.bitmap_index();
-            let bitmap_count0 = entry0.bitmap_count();
-            let bitmap_index1 = entry1.bitmap_index();
-            let bitmap_count1 = entry1.bitmap_count();
-            let bitmap_index2 = entry2.bitmap_index();
-            let bitmap_count2 = entry2.bitmap_count();
-            let bitmap_index3 = entry3.bitmap_index();
-            let bitmap_count3 = entry3.bitmap_count();
+        for [
+            CompactBitmapEntry { value: entry0 },
+            CompactBitmapEntry { value: entry1 },
+            CompactBitmapEntry { value: entry2 },
+            CompactBitmapEntry { value: entry3 },
+        ] in bitmap_entries_batch
+        {
+            let entries = wide::u32x4::new([*entry0, *entry1, *entry2, *entry3]);
+            let indices: wide::u32x4 = entries >> 8;
+            let counts = entries & wide::u32x4::new([0xFF; 4]);
+            let [bitmap_index0, bitmap_index1, bitmap_index2, bitmap_index3] = indices.to_array();
+            let [bitmap_count0, bitmap_count1, bitmap_count2, bitmap_count3] = counts.to_array();
+            // let bitmap_index0 = entry0.bitmap_index();
+            // let bitmap_count0 = entry0.bitmap_count();
+            // let bitmap_index1 = entry1.bitmap_index();
+            // let bitmap_count1 = entry1.bitmap_count();
+            // let bitmap_index2 = entry2.bitmap_index();
+            // let bitmap_count2 = entry2.bitmap_count();
+            // let bitmap_index3 = entry3.bitmap_index();
+            // let bitmap_count3 = entry3.bitmap_count();
             debug_assert!(
-                bitmap_index0 < self.fuzzing_bitmap.as_ref().len(),
+                (bitmap_index0 as usize) < self.fuzzing_bitmap.as_ref().len(),
                 "Unexpected OOB"
             );
             debug_assert!(
-                bitmap_index1 < self.fuzzing_bitmap.as_ref().len(),
+                (bitmap_index1 as usize) < self.fuzzing_bitmap.as_ref().len(),
                 "Unexpected OOB"
             );
             debug_assert!(
-                bitmap_index2 < self.fuzzing_bitmap.as_ref().len(),
+                (bitmap_index2 as usize) < self.fuzzing_bitmap.as_ref().len(),
                 "Unexpected OOB"
             );
             debug_assert!(
-                bitmap_index3 < self.fuzzing_bitmap.as_ref().len(),
+                (bitmap_index3 as usize) < self.fuzzing_bitmap.as_ref().len(),
                 "Unexpected OOB"
             );
 
             let count = unsafe {
                 self.fuzzing_bitmap
                     .as_mut()
-                    .get_unchecked_mut(bitmap_index0)
+                    .get_unchecked_mut(bitmap_index0 as usize)
             };
-            *count = count.wrapping_add(bitmap_count0);
+            *count = count.wrapping_add(bitmap_count0 as u8);
             let count = unsafe {
                 self.fuzzing_bitmap
                     .as_mut()
-                    .get_unchecked_mut(bitmap_index1)
+                    .get_unchecked_mut(bitmap_index1 as usize)
             };
-            *count = count.wrapping_add(bitmap_count1);
+            *count = count.wrapping_add(bitmap_count1 as u8);
             let count = unsafe {
                 self.fuzzing_bitmap
                     .as_mut()
-                    .get_unchecked_mut(bitmap_index2)
+                    .get_unchecked_mut(bitmap_index2 as usize)
             };
-            *count = count.wrapping_add(bitmap_count2);
+            *count = count.wrapping_add(bitmap_count2 as u8);
             let count = unsafe {
                 self.fuzzing_bitmap
                     .as_mut()
-                    .get_unchecked_mut(bitmap_index3)
+                    .get_unchecked_mut(bitmap_index3 as usize)
             };
-            *count = count.wrapping_add(bitmap_count3);
+            *count = count.wrapping_add(bitmap_count3 as u8);
         }
 
-        for bitmap_entry in rem {
+        let rem_len = rem.len();
+        'rem_process: {
+            if rem_len == 0 {
+                break 'rem_process;
+            }
+            let bitmap_entry = unsafe { rem.get_unchecked(0) };
+            let bitmap_index = bitmap_entry.bitmap_index();
+            debug_assert!(
+                bitmap_index < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+            let count = unsafe { self.fuzzing_bitmap.as_mut().get_unchecked_mut(bitmap_index) };
+            *count = count.wrapping_add(bitmap_entry.bitmap_count());
+            if rem_len == 1 {
+                break 'rem_process;
+            }
+            let bitmap_entry = unsafe { rem.get_unchecked(1) };
+            let bitmap_index = bitmap_entry.bitmap_index();
+            debug_assert!(
+                bitmap_index < self.fuzzing_bitmap.as_ref().len(),
+                "Unexpected OOB"
+            );
+            let count = unsafe { self.fuzzing_bitmap.as_mut().get_unchecked_mut(bitmap_index) };
+            *count = count.wrapping_add(bitmap_entry.bitmap_count());
+            if rem_len == 2 {
+                break 'rem_process;
+            }
+            let bitmap_entry = unsafe { rem.get_unchecked(2) };
             let bitmap_index = bitmap_entry.bitmap_index();
             debug_assert!(
                 bitmap_index < self.fuzzing_bitmap.as_ref().len(),
@@ -325,6 +363,16 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             let count = unsafe { self.fuzzing_bitmap.as_mut().get_unchecked_mut(bitmap_index) };
             *count = count.wrapping_add(bitmap_entry.bitmap_count());
         }
+
+        // for bitmap_entry in rem {
+        //     let bitmap_index = bitmap_entry.bitmap_index();
+        //     debug_assert!(
+        //         bitmap_index < self.fuzzing_bitmap.as_ref().len(),
+        //         "Unexpected OOB"
+        //     );
+        //     let count = unsafe { self.fuzzing_bitmap.as_mut().get_unchecked_mut(bitmap_index) };
+        //     *count = count.wrapping_add(bitmap_entry.bitmap_count());
+        // }
         self.set_new_loc(new_bb);
 
         Ok(())

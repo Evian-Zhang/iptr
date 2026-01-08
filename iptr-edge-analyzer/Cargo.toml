@@ -34,3 +34,4 @@ iced-x86 = { workspace = true }
 hashbrown = { workspace = true }
 zerocopy = { workspace = true, features = ["derive"] }
 derive_hash_fast = { workspace = true }
+wide = { workspace = true}
