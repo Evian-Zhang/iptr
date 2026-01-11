@@ -71,23 +71,7 @@ fn main() -> Result<()> {
         round,
     } = Cmdline::parse();
 
-    let range = match (range_start, range_end) {
-        (Some(start), Some(end)) => {
-            let start = start.strip_prefix("0x").unwrap_or(&start);
-            let start = u64::from_str_radix(start, 16).context("Invalid --range-start")?;
-
-            let end = end.strip_prefix("0x").unwrap_or(&end);
-            let end = u64::from_str_radix(end, 16).context("Invalid --range-start")?;
-
-            Some([(start, end)])
-        }
-        (None, None) => None,
-        _ => {
-            return Err(anyhow::anyhow!(
-                "--range-start and --range-end should be given at the same time"
-            ));
-        }
-    };
+    let range = iptr_libxdc_exp::extract_range(range_start, range_end)?;
 
     let mut bitmap = vec![0u8; 0x10000].into_boxed_slice();
 

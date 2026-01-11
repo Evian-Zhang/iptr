@@ -1,10 +1,32 @@
 pub mod memory_reader;
 
+use anyhow::{Context, Result};
 #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 use iptr_edge_analyzer::{
     DiagnosticInformation, EdgeAnalyzer,
     control_flow_handler::fuzz_bitmap::FuzzBitmapDiagnosticInformation,
 };
+
+pub fn extract_range(
+    range_start: Option<String>,
+    range_end: Option<String>,
+) -> Result<Option<[(u64, u64); 1]>> {
+    match (range_start, range_end) {
+        (Some(start), Some(end)) => {
+            let start = start.strip_prefix("0x").unwrap_or(&start);
+            let start = u64::from_str_radix(start, 16).context("Invalid --range-start")?;
+
+            let end = end.strip_prefix("0x").unwrap_or(&end);
+            let end = u64::from_str_radix(end, 16).context("Invalid --range-start")?;
+
+            Ok(Some([(start, end)]))
+        }
+        (None, None) => Ok(None),
+        _ => Err(anyhow::anyhow!(
+            "--range-start and --range-end should be given at the same time"
+        )),
+    }
+}
 
 #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 pub fn report_diagnose(
