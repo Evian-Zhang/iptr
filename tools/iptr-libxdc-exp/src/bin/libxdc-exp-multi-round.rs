@@ -1,20 +1,22 @@
-mod memory_reader;
-
 use std::{fs::File, path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
+#[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 use iptr_edge_analyzer::{
     DiagnosticInformation, EdgeAnalyzer,
-    control_flow_handler::fuzz_bitmap::{
-        FuzzBitmapControlFlowHandler, FuzzBitmapDiagnosticInformation,
-    },
+    control_flow_handler::fuzz_bitmap::FuzzBitmapDiagnosticInformation,
 };
-
-use crate::memory_reader::MemoryReader;
+use iptr_edge_analyzer::{
+    EdgeAnalyzer, control_flow_handler::fuzz_bitmap::FuzzBitmapControlFlowHandler,
+};
+use iptr_libxdc_exp::memory_reader::MemoryReader;
 
 /// A standalone binary for libxdc-like evaluation
+///
+/// This program will decode the same Intel PT trace multiple times,
+/// targeting at testing the performance of cache querying.
 ///
 /// This binary implements memory reader compatible of
 /// that in libxdc_experiments.
@@ -49,18 +51,11 @@ struct Cmdline {
     /// the same time.
     #[arg(long)]
     range_end: Option<String>,
-    /// Number of round for repeated evaluation, if given.
+    /// Number of round for repeated evaluation.
     ///
-    /// If this option is not given, the evaluation will
-    /// only be repeated once
+    /// The value should be greater than 1.
     #[arg(long)]
-    round: Option<usize>,
-    /// Path for writing bitmap output, if given.
-    ///
-    /// The bitmap is initialized with all zero data with
-    /// 0x10000 size.
-    #[arg(long)]
-    bitmap_output: Option<PathBuf>,
+    round: usize,
 }
 
 #[expect(clippy::cast_precision_loss)]
@@ -74,7 +69,6 @@ fn main() -> Result<()> {
         range_start,
         range_end,
         round,
-        bitmap_output,
     } = Cmdline::parse();
 
     let range = match (range_start, range_end) {
@@ -114,88 +108,37 @@ fn main() -> Result<()> {
     // SAFETY: check the safety requirements of memmap2 documentation
     let buf = unsafe { memmap2::Mmap::map(&file).context("Failed to mmap input file")? };
 
-    if let Some(round) = round {
-        if round <= 1 {
-            return Err(anyhow::anyhow!("Round should be larger than 1"));
-        }
+    let instant = Instant::now();
+    iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+    let cold_time = instant.elapsed();
+    log::info!("run_time_cold = {}", cold_time.as_nanos());
+    #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
+    iptr_libxdc_exp::report_diagnose(
+        &packet_handler.diagnose(),
+        &packet_handler.handler().diagnose(),
+    );
 
-        let instant = Instant::now();
-        iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
-        let cold_time = instant.elapsed();
-        log::info!("run_time_cold = {}", cold_time.as_nanos());
-        #[cfg(not(feature = "debug"))]
-        report_diagnose(
-            &packet_handler.diagnose(),
-            &packet_handler.handler().diagnose(),
-        );
-
-        let round = round - 1;
-        let mut total_time = 0;
-        for _ in 0..round {
-            let instant = Instant::now();
-            iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
-            let time = instant.elapsed();
-            let time = time.as_nanos();
-            total_time += time;
-            log::info!("run_time = {time}");
-
-            #[cfg(not(feature = "debug"))]
-            report_diagnose(
-                &packet_handler.diagnose(),
-                &packet_handler.handler().diagnose(),
-            );
-        }
-        log::info!("avg_time = {}", total_time as f64 / round as f64);
-    } else {
-        iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
-
-        #[cfg(not(feature = "debug"))]
-        report_diagnose(
-            &packet_handler.diagnose(),
-            &packet_handler.handler().diagnose(),
-        );
-
-        drop(packet_handler);
-        if let Some(bitmap_output) = bitmap_output {
-            std::fs::write(bitmap_output, &bitmap)?;
-        }
+    if round <= 1 {
+        return Err(anyhow::anyhow!("--round should be greater than 1"));
     }
 
-    Ok(())
-}
+    let round = round - 1;
+    let mut total_time = 0;
+    for _ in 0..round {
+        let instant = Instant::now();
+        iptr_decoder::decode(&buf, DecodeOptions::default(), &mut packet_handler).unwrap();
+        let time = instant.elapsed();
+        let time = time.as_nanos();
+        total_time += time;
+        log::info!("run_time = {time}");
 
-#[allow(unused)]
-fn report_diagnose(
-    diagnostic_information: &DiagnosticInformation,
-    fuzz_bitmap_diagnostic_information: &FuzzBitmapDiagnosticInformation,
-) {
-    let DiagnosticInformation {
-        cfg_size,
-        cache_trailing_bits_size,
-        cache8_size,
-        cache32_size,
-        cache_32bit_hit_count,
-        cache_8bit_hit_count,
-        cache_trailing_bits_hit_count,
-        cache_missed_bit_count,
-    } = &diagnostic_information;
-    let FuzzBitmapDiagnosticInformation {
-        bitmap_entries_count,
-    } = fuzz_bitmap_diagnostic_information;
-    log::info!(
-        "Analyzer diagnose statistics
-CFG size {cfg_size}
-Cache size
-\t{cache_trailing_bits_size} trailing bits
-\t{cache8_size} 8bits
-\t{cache32_size} 32bits
-Cache hitcount
-\t{cache_trailing_bits_hit_count} trailing bits
-\t{cache_8bit_hit_count} 8bits
-\t{cache_32bit_hit_count} 32bits
-\t{cache_missed_bit_count} missed
-Fuzz bitmap
-\t{bitmap_entries_count} raw bitmap entries
-    "
-    );
+        #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
+        iptr_libxdc_exp::report_diagnose(
+            &packet_handler.diagnose(),
+            &packet_handler.handler().diagnose(),
+        );
+    }
+    log::info!("avg_time = {}", total_time as f64 / round as f64);
+
+    Ok(())
 }

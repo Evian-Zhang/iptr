@@ -4,7 +4,8 @@ members = [
   "iptr-decoder",
   "iptr-edge-analyzer",
   "iptr-perf-pt-reader",
-  "tools/iptr-libxdc-experiments-standalone-decoder", "tools/iptr-perf-memory-extractor",
+  "tools/iptr-libxdc-exp",
+  "tools/iptr-perf-memory-extractor",
   "tools/iptr-perf-pt-analyzer",
   "tools/iptr-perf-pt-extractor",
   "tools/iptr-raw-logger",
@@ -28,6 +29,8 @@ iced-x86 = "1.21"
 hashbrown = "0.16"
 zerocopy = "0.8"
 derive_hash_fast = "0.2"
+serde = "1"
+serde_json = "1"
 
 [workspace.package]
 version = "0.1.0"
