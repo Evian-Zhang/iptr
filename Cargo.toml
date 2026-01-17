@@ -38,6 +38,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Evian-Zhang/iptr/"
+homepage = "https://github.com/Evian-Zhang/iptr/"
 readme = "./README.md"
 
 [workspace.lints.clippy]

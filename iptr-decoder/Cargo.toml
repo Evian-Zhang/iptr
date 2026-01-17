@@ -1,10 +1,12 @@
 [package]
 name = "iptr-decoder"
-description = "Low-level Intel PT decoder"
+description = "Idiomatic Rust-style low-level Intel PT trace handler."
 keywords = ["Intel PT"]
-version = { workspace = true }
+version = "0.1.0"
+categories = ["no-std", "parser-implementations", "hardware-support"]
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
 
 [features]
@@ -12,9 +14,7 @@ default = []
 ## Enable the alloc dependency. Used only for `log_handler` for now.
 alloc = []
 ## Enable crate::packet_handler::log, which includes handler for logging low level packets
-log_handler = [
-  "alloc",
-]
+log_handler = ["alloc", "dep:log"]
 
 [lints]
 workspace = true
@@ -24,4 +24,4 @@ thiserror = { workspace = true }
 derive_more = { workspace = true, features = ["display"] }
 memchr = { workspace = true }
 perfect-derive = { workspace = true }
-log = { workspace = true }
+log = { workspace = true, optional = true }
