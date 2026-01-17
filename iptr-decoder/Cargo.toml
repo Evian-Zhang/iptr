@@ -9,6 +9,9 @@ license = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
 
+[package.metadata."docs.rs"]
+all-features = true
+
 [features]
 default = []
 ## Enable the alloc dependency. Used only for `log_handler` for now.

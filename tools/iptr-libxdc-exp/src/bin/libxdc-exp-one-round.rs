@@ -3,11 +3,6 @@ use std::{fs::File, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use iptr_decoder::DecodeOptions;
-#[cfg(all(not(feature = "debug"), feature = "diagnose"))]
-use iptr_edge_analyzer::{
-    DiagnosticInformation, EdgeAnalyzer,
-    control_flow_handler::fuzz_bitmap::FuzzBitmapDiagnosticInformation,
-};
 use iptr_edge_analyzer::{
     EdgeAnalyzer, control_flow_handler::fuzz_bitmap::FuzzBitmapControlFlowHandler,
 };

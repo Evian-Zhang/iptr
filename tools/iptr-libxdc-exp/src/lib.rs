@@ -3,8 +3,7 @@ pub mod memory_reader;
 use anyhow::{Context, Result};
 #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 use iptr_edge_analyzer::{
-    DiagnosticInformation, EdgeAnalyzer,
-    control_flow_handler::fuzz_bitmap::FuzzBitmapDiagnosticInformation,
+    DiagnosticInformation, control_flow_handler::fuzz_bitmap::FuzzBitmapDiagnosticInformation,
 };
 
 pub fn extract_range(
