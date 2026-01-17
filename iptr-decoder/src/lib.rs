@@ -337,6 +337,43 @@ pub trait HandlePacket {
     ) -> Result<(), Self::Error> {
         Ok(())
     }
+
+    /// Handle BBP packet
+    ///
+    /// `sz_bit` is the SZ bit, `r#type` is `Type[4:0]` (upper 3 bits guaranteed cleared).
+    #[expect(unused)]
+    fn on_bbp_packet(
+        &mut self,
+        context: &DecoderContext,
+        sz_bit: bool,
+        r#type: u8,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    /// Handle BEP packet
+    ///
+    /// `ip_bit` is the IP bit.
+    #[expect(unused)]
+    fn on_bep_packet(&mut self, context: &DecoderContext, ip_bit: bool) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    /// Handle BIP packet
+    ///
+    /// `id` is `ID[5:0]`, `payload`'s size is 4 or 8 according to
+    /// the `SZ` bit in BBP packet. `bbp_type` is the `type` field
+    /// of the preceding BBP packet.
+    #[expect(unused)]
+    fn on_bip_packet(
+        &mut self,
+        context: &DecoderContext,
+        id: u8,
+        payload: &[u8],
+        bbp_type: u8,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
 /// Execution mode
@@ -353,8 +390,8 @@ pub enum TraceeMode {
 impl TraceeMode {
     /// Get the bitness of current tracee mode
     #[must_use]
-    pub fn bitness(&self) -> u32 {
-        *self as u32
+    pub fn bitness(self) -> u32 {
+        self as u32
     }
 }
 
@@ -364,6 +401,42 @@ pub struct DecoderContext {
     pos: usize,
     /// Current tracee mode (will be modified by MODE.exec packet)
     tracee_mode: TraceeMode,
+    /// Information about packet block.
+    ///
+    /// If this field is [`Some`], this indicates that current mode
+    /// is packet block mode, which means we are between a BBP and BEP
+    packet_block: Option<PacketBlockInformation>,
+}
+
+/// Size of packet block
+#[derive(Clone, Copy)]
+enum PacketBlockSize {
+    /// 4-byte block items
+    Dword = 4,
+    /// 8-byte block items
+    Qword = 8,
+}
+
+impl PacketBlockSize {
+    /// Create from the `SZ` bit in BBP packet
+    #[must_use]
+    fn from_sz_bit(sz: bool) -> Self {
+        if sz { Self::Qword } else { Self::Dword }
+    }
+
+    /// Get block items size
+    const fn size(self) -> usize {
+        self as usize
+    }
+}
+
+/// Information about packet blocks, derived from BBP packet
+#[derive(Clone, Copy)]
+struct PacketBlockInformation {
+    /// Size of packet block items
+    size: PacketBlockSize,
+    /// Type of packet block items, retrieved from BBP packet's `Type[4:0]`
+    r#type: u8,
 }
 
 impl DecoderContext {
@@ -371,6 +444,16 @@ impl DecoderContext {
     #[must_use]
     pub fn tracee_mode(&self) -> TraceeMode {
         self.tracee_mode
+    }
+
+    /// Whether we are between a BBP and BEP packets.
+    ///
+    /// When you invokes this method in a BBP packet handler,
+    /// this will return the status **before** current BBP packet.
+    /// Same for BEP and OVF packet.
+    #[must_use]
+    pub fn is_in_packet_blocks(&self) -> bool {
+        self.packet_block.is_some()
     }
 }
 
@@ -453,6 +536,7 @@ pub fn decode<H: HandlePacket>(
     let mut context = DecoderContext {
         pos: start_pos,
         tracee_mode,
+        packet_block: None,
     };
 
     raw_packet_handler::level1::decode(buf, &mut context, packet_handler)

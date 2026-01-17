@@ -95,11 +95,36 @@ fn handle_pad_packet<H: HandlePacket>(
 
 #[inline]
 fn handle_short_tnt_packet<H: HandlePacket>(
-    _buf: &[u8],
+    buf: &[u8],
     byte: u8,
     context: &mut DecoderContext,
     packet_handler: &mut H,
 ) -> DecoderResult<(), H> {
+    if let Some(packet_block) = context.packet_block {
+        // Special handling if we are between BBP and BEP
+
+        if (byte & 0b0000_0111) != 0b0000_0100 {
+            // BIP's first byte is end with 100
+            return Err(DecoderError::InvalidPacket);
+        }
+
+        let packet_length = packet_block.size.size() + 1;
+        let id = byte >> 3;
+        let Some(bytes) = buf
+            .get((context.pos + 1)..)
+            .and_then(|buf| buf.chunks_exact(packet_block.size.size()).next())
+        else {
+            return Err(DecoderError::UnexpectedEOF);
+        };
+        packet_handler
+            .on_bip_packet(context, id, bytes, packet_block.r#type)
+            .map_err(DecoderError::PacketHandler)?;
+
+        context.pos += packet_length;
+
+        return Ok(());
+    }
+
     // SAFETY: byte will never be zero
     debug_assert_ne!(byte, 0, "0b0000_0000 should be PAD packet!");
     let byte = unsafe { NonZero::new_unchecked(byte) };

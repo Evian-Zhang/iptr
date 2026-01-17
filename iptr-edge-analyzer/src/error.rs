@@ -8,6 +8,7 @@ use crate::{HandleControlFlow, ReadMemory};
 /// Error for edge analysis
 #[derive(Error)]
 #[perfect_derive(Debug)]
+#[non_exhaustive]
 pub enum AnalyzerError<H: HandleControlFlow, R: ReadMemory> {
     /// Control flow handler error
     #[error("Control flow handler error")]

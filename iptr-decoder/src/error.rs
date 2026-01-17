@@ -10,6 +10,7 @@ use crate::HandlePacket;
 /// Error for the decoding
 #[derive(Error)]
 #[perfect_derive(Debug)]
+#[non_exhaustive]
 pub enum DecoderError<H: HandlePacket> {
     /// Packet handler error
     #[error("Packet handler error")]
@@ -26,12 +27,6 @@ pub enum DecoderError<H: HandlePacket> {
     /// Unexpected EOF
     #[error("Unexpected EOF")]
     UnexpectedEOF,
-    /// Currently unimplemented
-    #[error("Unimplemented")]
-    Unimplemented,
-    /// Unexpected decoder error
-    #[error("Unexpected decoder error")]
-    Unexpected,
 }
 
 pub(crate) type DecoderResult<T, H> = core::result::Result<T, DecoderError<H>>;

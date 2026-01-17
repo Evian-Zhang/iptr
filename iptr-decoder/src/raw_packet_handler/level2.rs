@@ -3,7 +3,7 @@ use core::{hint::unreachable_unchecked, num::NonZero};
 use derive_more::Display;
 
 use crate::{
-    DecoderContext, HandlePacket,
+    DecoderContext, HandlePacket, PacketBlockInformation, PacketBlockSize,
     error::{DecoderError, DecoderResult},
 };
 
@@ -201,6 +201,7 @@ fn handle_ovf_packet<H: HandlePacket>(
         .on_ovf_packet(context)
         .map_err(DecoderError::PacketHandler)?;
 
+    context.packet_block = None;
     context.pos += packet_length;
 
     Ok(())
@@ -451,26 +452,6 @@ fn handle_pwrx_packet<H: HandlePacket>(
 }
 
 #[inline]
-fn handle_bbp_packet<H: HandlePacket>(
-    _buf: &[u8],
-    _byte: u8,
-    _context: &mut DecoderContext,
-    _packet_handler: &mut H,
-) -> DecoderResult<(), H> {
-    Err(DecoderError::Unimplemented)
-}
-
-#[inline]
-fn handle_bep_packet<H: HandlePacket>(
-    _buf: &[u8],
-    _byte: u8,
-    _context: &mut DecoderContext,
-    _packet_handler: &mut H,
-) -> DecoderResult<(), H> {
-    Err(DecoderError::Unimplemented)
-}
-
-#[inline]
 fn handle_cfe_packet<H: HandlePacket>(
     buf: &[u8],
     byte: u8,
@@ -528,6 +509,51 @@ fn handle_evd_packet<H: HandlePacket>(
         .on_evd_packet(context, r#type, payload)
         .map_err(DecoderError::PacketHandler)?;
 
+    context.pos += packet_length;
+
+    Ok(())
+}
+
+#[inline]
+fn handle_bbp_packet<H: HandlePacket>(
+    buf: &[u8],
+    _byte: u8,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 3;
+
+    let Some(byte) = buf.get(context.pos + 2) else {
+        return Err(DecoderError::UnexpectedEOF);
+    };
+    let sz_bit = (*byte & 0b1000_0000) != 0;
+    let size = PacketBlockSize::from_sz_bit(sz_bit);
+    let r#type = *byte & 0b0001_1111;
+    packet_handler
+        .on_bbp_packet(context, sz_bit, r#type)
+        .map_err(DecoderError::PacketHandler)?;
+
+    context.packet_block = Some(PacketBlockInformation { size, r#type });
+    context.pos += packet_length;
+
+    Ok(())
+}
+
+#[inline]
+fn handle_bep_packet<H: HandlePacket>(
+    _buf: &[u8],
+    byte: u8,
+    context: &mut DecoderContext,
+    packet_handler: &mut H,
+) -> DecoderResult<(), H> {
+    let packet_length = 2;
+
+    let ip_bit = (byte & 0b1000_0000) != 0;
+    packet_handler
+        .on_bep_packet(context, ip_bit)
+        .map_err(DecoderError::PacketHandler)?;
+
+    context.packet_block = None;
     context.pos += packet_length;
 
     Ok(())
