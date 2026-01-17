@@ -5,12 +5,13 @@
 To use this crate, add this crate to your `Cargo.toml`:
 
 ```toml
+[dependencies]
 iptr-decoder = "0.1"
 ```
 
 ## Basic usage
 
-The core functionalities are designed within the trait [`HandlePacket`](https://docs.rs/iptr-decoder/latest/iptr-decoder/trait.HandlePacket.html). A typical usage example is like the following code snippet.
+The core functionalities are designed within the trait [`HandlePacket`](https://docs.rs/iptr-decoder/latest/iptr_decoder/trait.HandlePacket.html). A typical usage example is like the following code snippet.
 
 ```rust
 use iptr_decoder::{DecoderContext, DecodeOptions, HandlePacket};
@@ -89,11 +90,11 @@ The `HandlePacket` trait has a lot of provided methods, each of which is corresp
 
 ## Advanced Usage
 
-Apart from customized `HandlePacket` implementors, this crate also provides some common packet handlers, which are organized in the [`iptr_decoder::packet_handler`](https://docs.rs/iptr-decoder/latest/iptr-decoder/packet_handler/index.html) module.
+Apart from customized `HandlePacket` implementors, this crate also provides some common packet handlers, which are organized in the [`iptr_decoder::packet_handler`](https://docs.rs/iptr-decoder/latest/iptr_decoder/packet_handler/index.html) module.
 
-For example, the [`PacketHandlerRawLogger`](https://docs.rs/iptr-decoder/latest/iptr-decoder/packet_handler/log/struct.PacketHandlerRawLogger.html) logs all packet's information, and [`PacketCounter`](https://docs.rs/iptr-decoder/latest/iptr-decoder/packet_handler/packet_counter/struct.PacketCounter.html) can tell us how many PT packets are decoded in total.
+For example, the [`PacketHandlerRawLogger`](https://docs.rs/iptr-decoder/latest/iptr_decoder/packet_handler/log/struct.PacketHandlerRawLogger.html) logs all packet's information, and [`PacketCounter`](https://docs.rs/iptr-decoder/latest/iptr_decoder/packet_handler/packet_counter/struct.PacketCounter.html) can tell us how many PT packets are decoded in total.
 
-Moreover, we provide a powerful [`CombinedPacketHandler`](https://docs.rs/iptr-decoder/latest/iptr-decoder/packet_handler/combined/struct.CombinedPacketHandler.html). With this structure, you can use the provided common packet handlers alongwith your own customized `HandlePacket` implementors:
+Moreover, we provide a powerful [`CombinedPacketHandler`](https://docs.rs/iptr-decoder/latest/iptr_decoder/packet_handler/combined/struct.CombinedPacketHandler.html). With this structure, you can use the provided common packet handlers alongwith your own customized `HandlePacket` implementors:
 
 ```rust
 use iptr_decoder::{
@@ -128,7 +129,7 @@ This crate has the following features:
 
 * `log_handler`
 
-   Enable [`iptr_decoder::packet_handler::log`](https://docs.rs/iptr-decoder/latest/iptr-decoder/packet_handler/log/index.html), which includes handler for logging low level packets.
+   Enable [`iptr_decoder::packet_handler::log`](https://docs.rs/iptr-decoder/latest/iptr_decoder/packet_handler/log/index.html), which includes handler for logging low level packets.
 
    This feature is not enabled by default.
 * `alloc`
