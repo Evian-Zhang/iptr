@@ -21,7 +21,7 @@ debug = ["iptr-decoder/log_handler"]
 
 [dependencies]
 iptr-decoder = { workspace = true }
-iptr-edge-analyzer = { workspace = true, features = ["fuzz_bitmap"] }
+iptr-edge-analyzer = { workspace = true, features = ["cache", "fuzz_bitmap"] }
 clap = { workspace = true, features = ["derive"] }
 memmap2 = { workspace = true }
 thiserror = { workspace = true }
