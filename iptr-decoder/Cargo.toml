@@ -9,7 +9,7 @@ license = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
 
-[package.metadata."docs.rs"]
+[package.metadata.docs.rs]
 all-features = true
 
 [features]
