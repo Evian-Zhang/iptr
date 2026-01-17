@@ -30,3 +30,4 @@ log = { workspace = true }
 env_logger = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+indicatif = { workspace = true }

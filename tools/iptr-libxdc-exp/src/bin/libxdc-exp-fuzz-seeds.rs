@@ -2,6 +2,7 @@ use std::{fs::File, io::BufWriter, path::PathBuf, time::Instant};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use indicatif::ProgressIterator;
 use iptr_decoder::DecodeOptions;
 #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 use iptr_edge_analyzer::{
@@ -107,14 +108,15 @@ fn main() -> Result<()> {
     let mut times = Vec::with_capacity(max_index);
     let mut pt_traces = Vec::with_capacity(max_index);
     for index in 0..=max_index {
-        pt_traces.push(
-            std::fs::read(input.join(format!("{index}.bin")))
-                .context("Failed to read file in input directory")?,
-        );
+        let input_path = input.join(format!("{index}.pt"));
+        pt_traces.push(std::fs::read(&input_path).context(format!(
+            "Failed to read {} in input directory",
+            input_path.display()
+        ))?);
     }
 
     let instant = Instant::now();
-    for pt_trace in pt_traces {
+    for pt_trace in pt_traces.into_iter().progress() {
         iptr_decoder::decode(&pt_trace, DecodeOptions::default(), &mut packet_handler).unwrap();
         let time = instant.elapsed();
         let time = time.as_nanos();
