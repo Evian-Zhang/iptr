@@ -1,0 +1,38 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install cargo-hack
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: cargo-hack
+    - name: Install taplo
+      uses: baptiste0928/cargo-install@v3
+      with:
+        crate: taplo-cli
+    - name: Run format check
+      run: cargo fmt --check
+    - name: Run TOML format check
+      run: taplo fmt --check
+    - name: Run doc tests
+      run: cargo test --verbose --doc
+    - name: Check with all features in all packages
+      run: cargo hack check --workspace --feature-powerset --no-dev-deps --verbose
+    - name: Run tests
+      run: cargo hack test --workspace --feature-powerset --no-dev-deps --verbose
+    - name: Run clippy
+      run: cargo hack clippy --workspace --feature-powerset --no-dev-deps --verbose
