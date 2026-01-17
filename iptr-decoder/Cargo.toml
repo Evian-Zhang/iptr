@@ -1,7 +1,7 @@
 [package]
 name = "iptr-decoder"
 description = "Idiomatic Rust-style low-level Intel PT trace handler."
-keywords = ["Intel PT"]
+keywords = ["intel-pt"]
 version = "0.1.0"
 categories = ["no-std", "parser-implementations", "hardware-support"]
 edition = { workspace = true }
