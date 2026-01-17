@@ -226,6 +226,9 @@ fn handle_fup_packet<H: HandlePacket>(
 }
 
 /// Pattern for IP reconstruction
+///
+/// You can use utility function [`reconstruct_ip_and_update_last`][crate::utils::reconstruct_ip_and_update_last]
+/// to use this enumerate.
 #[derive(Debug, Display, Clone, Copy)]
 pub enum IpReconstructionPattern {
     /// None, IP is out of context

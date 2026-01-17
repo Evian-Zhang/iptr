@@ -19,6 +19,8 @@ use core::{convert::Infallible, num::NonZero};
 use crate::{DecoderContext, HandlePacket, IpReconstructionPattern, PtwPayload};
 
 /// Handler for logging each packets
+///
+/// Please refer to the [module-level documentation](crate::packet_handler::log) for more detailed information.
 #[derive(Default)]
 pub struct PacketHandlerRawLogger {}
 

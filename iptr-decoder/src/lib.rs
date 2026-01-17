@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
+#![deny(missing_docs)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -7,6 +8,7 @@ extern crate alloc;
 pub mod error;
 pub mod packet_handler;
 mod raw_packet_handler;
+pub mod utils;
 
 use core::num::NonZero;
 

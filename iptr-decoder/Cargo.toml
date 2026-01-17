@@ -9,10 +9,12 @@ repository = { workspace = true }
 
 [features]
 default = []
+## Enable the alloc dependency. Used only for `log_handler` for now.
 alloc = []
+## Enable crate::packet_handler::log, which includes handler for logging low level packets
 log_handler = [
   "alloc",
-] # Enable crate::packet_handler::log, which includes handler for logging low level packets
+]
 
 [lints]
 workspace = true

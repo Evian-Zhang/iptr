@@ -160,36 +160,18 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
 
     /// Perform IP reconstruction and update the `last_ip` field,
     /// returns the full-width IP address
-    #[expect(
-        clippy::cast_sign_loss,
-        clippy::cast_possible_wrap,
-        clippy::enum_glob_use
-    )]
     fn reconstruct_ip_and_update_last(
         &mut self,
         ip_reconstruction_pattern: IpReconstructionPattern,
     ) -> Option<u64> {
-        use IpReconstructionPattern::*;
-        let ip = match ip_reconstruction_pattern {
-            OutOfContext => {
-                // `last_ip` is not updated
-                return None;
-            }
-            TwoBytesWithLastIp(payload) => {
-                (self.last_ip & 0xFFFF_FFFF_FFFF_0000) | (payload as u64)
-            }
-            FourBytesWithLastIp(payload) => {
-                (self.last_ip & 0xFFFF_FFFF_0000_0000) | (payload as u64)
-            }
-            SixBytesExtended(payload) => (((payload << 16) as i64) >> 16) as u64,
-            SixBytesWithLastIp(payload) => {
-                (self.last_ip & 0xFFFF_0000_0000_0000) | (payload as u64)
-            }
-            EightBytes(payload) => payload,
-        };
-        self.last_ip = ip;
+        if !iptr_decoder::utils::reconstruct_ip_and_update_last(
+            &mut self.last_ip,
+            ip_reconstruction_pattern,
+        ) {
+            return None;
+        }
 
-        Some(ip)
+        Some(self.last_ip)
     }
 
     /// Process the given TNT bit, querying the CFG graph without
