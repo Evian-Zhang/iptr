@@ -510,4 +510,48 @@ where
 
         Ok(())
     }
+
+    fn on_bbp_packet(
+        &mut self,
+        context: &DecoderContext,
+        sz_bit: bool,
+        r#type: u8,
+    ) -> Result<(), Self::Error> {
+        self.handler1
+            .on_bbp_packet(context, sz_bit, r#type)
+            .map_err(CombinedError::H1Error)?;
+        self.handler2
+            .on_bbp_packet(context, sz_bit, r#type)
+            .map_err(CombinedError::H2Error)?;
+
+        Ok(())
+    }
+
+    fn on_bep_packet(&mut self, context: &DecoderContext, ip_bit: bool) -> Result<(), Self::Error> {
+        self.handler1
+            .on_bep_packet(context, ip_bit)
+            .map_err(CombinedError::H1Error)?;
+        self.handler2
+            .on_bep_packet(context, ip_bit)
+            .map_err(CombinedError::H2Error)?;
+
+        Ok(())
+    }
+
+    fn on_bip_packet(
+        &mut self,
+        context: &DecoderContext,
+        id: u8,
+        payload: &[u8],
+        bbp_type: u8,
+    ) -> Result<(), Self::Error> {
+        self.handler1
+            .on_bip_packet(context, id, payload, bbp_type)
+            .map_err(CombinedError::H1Error)?;
+        self.handler2
+            .on_bip_packet(context, id, payload, bbp_type)
+            .map_err(CombinedError::H2Error)?;
+
+        Ok(())
+    }
 }

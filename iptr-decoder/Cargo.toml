@@ -2,7 +2,7 @@
 name = "iptr-decoder"
 description = "Idiomatic Rust-style low-level Intel PT trace handler."
 keywords = ["intel-pt"]
-version = "0.1.1"
+version = "0.1.2"
 categories = ["no-std", "parser-implementations", "hardware-support"]
 edition = { workspace = true }
 license = { workspace = true }

@@ -297,4 +297,37 @@ impl HandlePacket for PacketCounter {
 
         Ok(())
     }
+
+    fn on_bbp_packet(
+        &mut self,
+        _context: &DecoderContext,
+        _sz_bit: bool,
+        _type: u8,
+    ) -> Result<(), Self::Error> {
+        self.packet_count += 1;
+
+        Ok(())
+    }
+
+    fn on_bep_packet(
+        &mut self,
+        _context: &DecoderContext,
+        _ip_bit: bool,
+    ) -> Result<(), Self::Error> {
+        self.packet_count += 1;
+
+        Ok(())
+    }
+
+    fn on_bip_packet(
+        &mut self,
+        _context: &DecoderContext,
+        _id: u8,
+        _payload: &[u8],
+        _bbp_type: u8,
+    ) -> Result<(), Self::Error> {
+        self.packet_count += 1;
+
+        Ok(())
+    }
 }

@@ -14,7 +14,7 @@
 //! // Use handler1 ...
 //! ```
 
-use core::{convert::Infallible, num::NonZero};
+use core::{convert::Infallible, fmt::Write, num::NonZero};
 
 use crate::{DecoderContext, HandlePacket, IpReconstructionPattern, PtwPayload};
 
@@ -237,7 +237,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         mwait_hints: u8,
         ext: u8,
     ) -> Result<(), Self::Error> {
-        log::trace!("[MWAIT packet]\tMWAIT hints: {mwait_hints:#010b}\tEXT: {ext:#010b}");
+        log::trace!("[MWAIT packet]\tMWAIT hints: {mwait_hints:#010b}\tEXT: {ext:#04b}");
         Ok(())
     }
 
@@ -249,7 +249,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         resolved_thread_sub_c_state: u8,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[PWRE packet]\tHW: {hw}\tResolved Thread C-State: {resolved_thread_c_state:#010b}\tResolved Thread Sub C-State: {resolved_thread_sub_c_state:#010b}"
+            "[PWRE packet]\tHW: {hw}\tResolved Thread C-State: {resolved_thread_c_state:#06b}\tResolved Thread Sub C-State: {resolved_thread_sub_c_state:#06b}"
         );
         Ok(())
     }
@@ -262,7 +262,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         wake_reason: u8,
     ) -> Result<(), Self::Error> {
         log::trace!(
-            "[PWRX packet]\tLast Core C-State: {last_core_c_state:#010b}\tDeepest Core C-State: {deepest_core_c_state:#010b}\tWake Reason: {wake_reason:#010b}"
+            "[PWRX packet]\tLast Core C-State: {last_core_c_state:#06b}\tDeepest Core C-State: {deepest_core_c_state:#06b}\tWake Reason: {wake_reason:#06b}"
         );
         Ok(())
     }
@@ -273,7 +273,7 @@ impl HandlePacket for PacketHandlerRawLogger {
         r#type: u8,
         payload: u64,
     ) -> Result<(), Self::Error> {
-        log::trace!("[EVD packet]\tType: {type:#010b}\tPayload: {payload:#x}");
+        log::trace!("[EVD packet]\tType: {type:#07b}\tPayload: {payload:#x}");
         Ok(())
     }
 
@@ -284,7 +284,45 @@ impl HandlePacket for PacketHandlerRawLogger {
         r#type: u8,
         vector: u8,
     ) -> Result<(), Self::Error> {
-        log::trace!("[CFE packet]\tIP bit: {ip_bit}\tType: {type:#010b}\tVector: {vector:#010b}");
+        log::trace!("[CFE packet]\tIP bit: {ip_bit}\tType: {type:#07b}\tVector: {vector:#010b}");
+        Ok(())
+    }
+
+    fn on_bbp_packet(
+        &mut self,
+        _context: &DecoderContext,
+        sz_bit: bool,
+        r#type: u8,
+    ) -> Result<(), Self::Error> {
+        log::trace!("[BBP packet]\tSZ bit: {sz_bit}\tType: {type:#07b}");
+        Ok(())
+    }
+
+    fn on_bep_packet(
+        &mut self,
+        _context: &DecoderContext,
+        ip_bit: bool,
+    ) -> Result<(), Self::Error> {
+        log::trace!("[BEP packet]\tIP bit: {ip_bit}");
+        Ok(())
+    }
+
+    fn on_bip_packet(
+        &mut self,
+        _context: &DecoderContext,
+        id: u8,
+        payload: &[u8],
+        bbp_type: u8,
+    ) -> Result<(), Self::Error> {
+        log::trace!(
+            "[BIP packet]\tID: {id:#07b}\tpayload: {}\tbbp_type: {bbp_type:#07b}",
+            payload
+                .iter()
+                .fold(alloc::string::String::from("0b"), |mut output, byte| {
+                    let _ = core::write!(output, "{byte:08b}");
+                    output
+                })
+        );
         Ok(())
     }
 }
