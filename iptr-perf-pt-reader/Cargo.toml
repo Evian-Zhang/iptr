@@ -2,9 +2,11 @@
 name = "iptr-perf-pt-reader"
 description = "Perf.data parser for Intel PT data"
 keywords = ["intel-pt", "perf", "perf_data"]
-version = { workspace = true }
+version = "0.1.0"
+categories = ["no-std", "parser-implementations", "hardware-support"]
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
 
 [lints]
@@ -12,4 +14,3 @@ workspace = true
 
 [dependencies]
 thiserror = { workspace = true }
-log = { workspace = true }
