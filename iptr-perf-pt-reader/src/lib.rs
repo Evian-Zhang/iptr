@@ -1,4 +1,6 @@
+#![doc = include_str!("../README.md")]
 #![no_std]
+#![deny(missing_docs)]
 
 extern crate alloc;
 
@@ -9,14 +11,18 @@ use alloc::{
     vec::Vec,
 };
 
-pub mod error;
+mod error;
 mod util;
 
-use crate::error::{ReaderError, ReaderResult};
+pub use crate::error::ReaderError;
+use crate::error::ReaderResult;
 
+/// Value of `type`` field for mmaped perf header
 const PERF_RECORD_MMAP2: u32 = 10;
+/// Value of `type` field for auxtrace header
 const PERF_RECORD_AUXTRACE: u32 = 71;
 
+/// Extract raw Intel PT traces from `perf.data`.
 #[expect(clippy::cast_possible_truncation)]
 pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxtrace<'_>>> {
     let mut pt_auxtraces = Vec::new();
@@ -56,6 +62,7 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
     Ok(pt_auxtraces)
 }
 
+/// Extract raw Intel PT traces alongwith mmaped information from `perf.data`.
 #[expect(clippy::cast_possible_truncation)]
 pub fn extract_pt_auxtraces_and_mmap_data(
     perf_data: &[u8],
@@ -156,13 +163,21 @@ fn read_perf_event_header(perf_data: &[u8], pos: &mut usize) -> Option<PerfEvent
     Some(PerfEventHeader { r#type, misc, size })
 }
 
+/// AUXTRACE in `perf.data`
 pub struct PerfRecordAuxtrace<'a> {
+    /// Size of [`auxtrace_data`][Self::auxtrace_data]
     pub size: u64,
+    /// Offset
     pub offset: u64,
+    /// Referemce
     pub reference: u64,
+    /// Index of auxtrace in perf.data
     pub idx: u32,
+    /// Thread id
     pub tid: u32,
+    /// CPU id
     pub cpu: u32,
+    /// Real Intel PT data
     pub auxtrace_data: &'a [u8],
 }
 
@@ -200,15 +215,25 @@ fn read_auxtrace<'a>(perf_data: &'a [u8], pos: &mut usize) -> Option<PerfRecordA
     })
 }
 
+/// Mmap2 header in `perf.data`
 pub struct PerfMmap2Header {
+    /// Process id
     pub pid: u32,
+    /// Thread id
     pub tid: u32,
+    /// Target address
     pub addr: u64,
+    /// Mmaped length
     pub len: u64,
+    /// Offset of file
     pub pgoff: u64,
+    /// inode information
     pub inode: [u8; 24],
+    /// Permissions
     pub prot: u32,
+    /// Mmaped flags
     pub flags: u32,
+    /// Mmaped filename
     pub filename: String,
 }
 

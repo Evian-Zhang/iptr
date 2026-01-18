@@ -1,7 +1,7 @@
 [package]
 name = "iptr-perf-pt-reader"
 description = "Perf.data parser for Intel PT data"
-keywords = ["Intel PT", "perf", "perf.data"]
+keywords = ["intel-pt", "perf", "perf_data"]
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -9,9 +9,6 @@ repository = { workspace = true }
 
 [lints]
 workspace = true
-
-[features]
-default = []
 
 [dependencies]
 thiserror = { workspace = true }
