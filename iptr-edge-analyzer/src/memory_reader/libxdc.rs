@@ -1,33 +1,51 @@
 use std::{fs::File, io::Read, path::Path};
 
-use anyhow::{Context, Result};
-use iptr_edge_analyzer::ReadMemory;
+use super::ReadMemory;
 use memmap2::Mmap;
 use thiserror::Error;
 
 const PAGE_CACHE_ADDR_LINE_SIZE: u64 = 8;
 const PAGE_SIZE: usize = 0x1000;
 
-pub struct MemoryReader {
+pub struct LibxdcMemoryReader {
     pages: Mmap,
     page_maps: Vec<(u64, usize)>,
 }
 
-impl MemoryReader {
-    pub fn new(page_dump: &Path, page_addr: &Path) -> Result<Self> {
-        let page_dump_file = File::open(page_dump).context("Failed to open page dump file")?;
-        let mut page_addr_file = File::open(page_addr).context("Failed to open page addr file")?;
-        let page_addr_file_len = page_addr_file.metadata()?.len();
+#[derive(Debug, Error)]
+pub enum LibxdcMemoryReaderCreateError {
+    #[error("Failed to open page dump file")]
+    InvalidPageDumpFile(#[source] std::io::Error),
+    #[error("Failed to open page addr file")]
+    InvalidPageAddrFile(#[source] std::io::Error),
+    #[error("Size of page address file is not consistent with page dump file")]
+    InconsistentLength,
+}
+
+impl LibxdcMemoryReader {
+    pub fn new(page_dump: &Path, page_addr: &Path) -> Result<Self, LibxdcMemoryReaderCreateError> {
+        let page_dump_file =
+            File::open(page_dump).map_err(LibxdcMemoryReaderCreateError::InvalidPageDumpFile)?;
+        let mut page_addr_file =
+            File::open(page_addr).map_err(LibxdcMemoryReaderCreateError::InvalidPageAddrFile)?;
+        let page_addr_file_len = page_addr_file
+            .metadata()
+            .map_err(LibxdcMemoryReaderCreateError::InvalidPageAddrFile)?
+            .len();
         let num_pages = page_addr_file_len / PAGE_CACHE_ADDR_LINE_SIZE;
-        let page_dump_file_len = page_dump_file.metadata()?.len();
+        let page_dump_file_len = page_dump_file
+            .metadata()
+            .map_err(LibxdcMemoryReaderCreateError::InvalidPageDumpFile)?
+            .len();
         if num_pages * PAGE_SIZE as u64 != page_dump_file_len {
-            return Err(anyhow::anyhow!(
-                "Inconsistent page dump and page addr length"
-            ));
+            return Err(LibxdcMemoryReaderCreateError::InconsistentLength);
         }
 
         let mut page_maps = Vec::with_capacity(num_pages as usize);
-        let pages = unsafe { Mmap::map(&page_dump_file)? };
+        let pages = unsafe {
+            Mmap::map(&page_dump_file)
+                .map_err(LibxdcMemoryReaderCreateError::InvalidPageDumpFile)?
+        };
         let mut addr_buf = [0u8; 8];
         let mut offset = 0;
         while page_addr_file.read_exact(&mut addr_buf).is_ok() {
@@ -42,13 +60,13 @@ impl MemoryReader {
 }
 
 #[derive(Debug, Error)]
-pub enum MemoryReaderError {
+pub enum LibxdcMemoryReaderError {
     #[error("Not mmaped area {0:#x} accessed")]
     NotMmaped(u64),
 }
 
-impl ReadMemory for MemoryReader {
-    type Error = MemoryReaderError;
+impl ReadMemory for LibxdcMemoryReader {
+    type Error = LibxdcMemoryReaderError;
 
     fn at_decode_begin(&mut self) -> std::result::Result<(), Self::Error> {
         Ok(())
@@ -68,7 +86,7 @@ impl ReadMemory for MemoryReader {
             Ok(pos) => pos,
             Err(pos) => {
                 if pos == 0 {
-                    return Err(MemoryReaderError::NotMmaped(address));
+                    return Err(LibxdcMemoryReaderError::NotMmaped(address));
                 }
                 pos - 1
             }
@@ -81,14 +99,14 @@ impl ReadMemory for MemoryReader {
         let read_size = std::cmp::min(size, PAGE_SIZE.saturating_sub(start_offset as usize));
         if read_size == 0 {
             // This includes cases where address - page_addr > PAGE_SIZE
-            return Err(MemoryReaderError::NotMmaped(address));
+            return Err(LibxdcMemoryReaderError::NotMmaped(address));
         }
         let content_start = page_content_start + start_offset as usize;
         let Some(mem) = self
             .pages
             .get(content_start..(content_start.saturating_add(read_size)))
         else {
-            return Err(MemoryReaderError::NotMmaped(
+            return Err(LibxdcMemoryReaderError::NotMmaped(
                 address.saturating_add(read_size as u64) - 1,
             ));
         };

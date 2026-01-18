@@ -12,15 +12,7 @@ workspace = true
 
 [features]
 default = []
-std = []
-memory_reader = [
-  "dep:iptr-edge-analyzer",
-  "dep:memmap2",
-  "std",
-] # Enable a reader implementing iptr_edge_analyzer::MemoryReader
 
 [dependencies]
-iptr-edge-analyzer = { workspace = true, optional = true }
-memmap2 = { workspace = true, optional = true }
 thiserror = { workspace = true }
 log = { workspace = true }

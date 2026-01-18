@@ -1,4 +1,5 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
+
 extern crate alloc;
 
 use core::ffi::CStr;
@@ -9,8 +10,6 @@ use alloc::{
 };
 
 pub mod error;
-#[cfg(feature = "memory_reader")]
-pub mod memory_reader;
 mod util;
 
 use crate::error::{ReaderError, ReaderResult};

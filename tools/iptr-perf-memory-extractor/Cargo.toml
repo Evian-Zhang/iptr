@@ -7,7 +7,8 @@ repository.workspace = true
 readme.workspace = true
 
 [dependencies]
-iptr-perf-pt-reader = { workspace = true, features = ["memory_reader"] }
+iptr-edge-analyzer = { workspace = true, features = ["perf_memory_reader"] }
+iptr-perf-pt-reader = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

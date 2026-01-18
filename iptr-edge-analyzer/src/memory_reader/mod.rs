@@ -1,3 +1,8 @@
+#[cfg(feature = "libxdc_memory_reader")]
+pub mod libxdc;
+#[cfg(feature = "perf_memory_reader")]
+pub mod perf_mmap;
+
 /// Memory reader
 pub trait ReadMemory {
     /// Error for memory reading

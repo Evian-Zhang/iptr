@@ -6,8 +6,8 @@ use indicatif::ProgressIterator;
 use iptr_decoder::DecodeOptions;
 use iptr_edge_analyzer::{
     EdgeAnalyzer, control_flow_handler::fuzz_bitmap::FuzzBitmapControlFlowHandler,
+    memory_reader::libxdc::LibxdcMemoryReader,
 };
-use iptr_libxdc_exp::memory_reader::MemoryReader;
 use serde::Serialize;
 
 /// A standalone binary for libxdc-like evaluation
@@ -87,8 +87,8 @@ fn main() -> Result<()> {
 
     let mut bitmap = vec![0u8; 0x10000].into_boxed_slice();
 
-    let memory_reader =
-        MemoryReader::new(&page_dump, &page_addr).context("Failed to create memory reader")?;
+    let memory_reader = LibxdcMemoryReader::new(&page_dump, &page_addr)
+        .context("Failed to create memory reader")?;
     let control_flow_handler =
         FuzzBitmapControlFlowHandler::new(bitmap.as_mut(), range.as_ref().map(<[_; _]>::as_slice));
     let edge_analyzer = EdgeAnalyzer::new(control_flow_handler, memory_reader);

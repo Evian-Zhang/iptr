@@ -293,6 +293,9 @@ dependencies = [
  "hashbrown",
  "iced-x86",
  "iptr-decoder",
+ "iptr-perf-pt-reader",
+ "log",
+ "memmap2",
  "perfect-derive",
  "thiserror",
  "zerocopy",
@@ -322,6 +325,7 @@ dependencies = [
  "anyhow",
  "clap",
  "env_logger",
+ "iptr-edge-analyzer",
  "iptr-perf-pt-reader",
  "log",
  "memmap2",
@@ -356,9 +360,7 @@ dependencies = [
 name = "iptr-perf-pt-reader"
 version = "0.1.0"
 dependencies = [
- "iptr-edge-analyzer",
  "log",
- "memmap2",
  "thiserror",
 ]
 

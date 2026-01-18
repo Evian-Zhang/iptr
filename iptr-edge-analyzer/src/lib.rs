@@ -1,8 +1,10 @@
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 mod control_flow_cache;
 pub mod control_flow_handler;
 mod diagnose;
 pub mod error;
-mod memory_reader;
+pub mod memory_reader;
 mod static_analyzer;
 mod tnt_buffer;
 

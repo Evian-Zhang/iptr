@@ -16,8 +16,11 @@ debug = [
 
 [dependencies]
 iptr-decoder = { workspace = true }
-iptr-edge-analyzer = { workspace = true, features = ["cache"] }
-iptr-perf-pt-reader = { workspace = true, features = ["memory_reader"] }
+iptr-edge-analyzer = { workspace = true, features = [
+  "cache",
+  "perf_memory_reader",
+] }
+iptr-perf-pt-reader = { workspace = true }
 env_logger = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }

@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use iptr_perf_pt_reader::memory_reader::PerfMmapBasedMemoryReader;
+use iptr_edge_analyzer::memory_reader::perf_mmap::PerfMmapBasedMemoryReader;
 
 /// Create libxdc-experiments-compatible memory dump.
 ///
@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let (_pt_auxtraces, mmap2_headers) =
         iptr_perf_pt_reader::extract_pt_auxtraces_and_mmap_data(&buf)
             .context("Failed to parse perf.data format")?;
-    let memory_reader = PerfMmapBasedMemoryReader::new(&mmap2_headers);
+    let memory_reader = PerfMmapBasedMemoryReader::new(&mmap2_headers)?;
     let mut page_dump_file =
         BufWriter::new(File::create(page_dump).context("Failed to create page dump file")?);
     let mut page_addr_file =

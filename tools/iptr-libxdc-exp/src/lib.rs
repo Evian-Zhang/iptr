@@ -1,5 +1,3 @@
-pub mod memory_reader;
-
 use anyhow::{Context, Result};
 #[cfg(all(not(feature = "debug"), feature = "diagnose"))]
 use iptr_edge_analyzer::{

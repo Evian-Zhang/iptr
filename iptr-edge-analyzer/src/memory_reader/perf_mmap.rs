@@ -1,7 +1,10 @@
-use std::{fs::File, path::Path};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+};
 
-use crate::PerfMmap2Header;
-use iptr_edge_analyzer::ReadMemory;
+use super::ReadMemory;
+use iptr_perf_pt_reader::PerfMmap2Header;
 use memmap2::{Mmap, MmapOptions};
 use thiserror::Error;
 
@@ -32,6 +35,22 @@ pub enum PerfMmapBasedMemoryReaderError {
     NotMmaped(u64),
 }
 
+#[derive(Debug, Error)]
+pub enum PerfMmapBasedMemoryReaderCreateError {
+    #[error("Failed to open mmaped file {}: {source}", path.display())]
+    FileIo {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("Target file {} is shorter than mapped moment: expected {expect_length} bytes, but got {real_length} bytes.", path.display())]
+    FileTooShort {
+        path: PathBuf,
+        expect_length: u64,
+        real_length: u64,
+    },
+}
+
 impl PerfMmapBasedMemoryReader {
     /// Create a memory reader from mmap2 headers in perf.data.
     ///
@@ -44,8 +63,9 @@ impl PerfMmapBasedMemoryReader {
     /// (perf.data only records the mmap operation for the target process,
     /// we use the arguments of mmap to reconstruct the target memory)
     #[expect(clippy::cast_possible_truncation)]
-    #[must_use]
-    pub fn new(mmap2_headers: &[PerfMmap2Header]) -> Self {
+    pub fn new(
+        mmap2_headers: &[PerfMmap2Header],
+    ) -> Result<Self, PerfMmapBasedMemoryReaderCreateError> {
         let mut entries = Vec::with_capacity(mmap2_headers.len());
 
         for mmap2_header in mmap2_headers {
@@ -57,14 +77,12 @@ impl PerfMmapBasedMemoryReader {
                 );
                 continue;
             }
-            let Ok(file) = File::open(filename_path).inspect_err(|err| {
-                log::error!(
-                    "Failed to open mmaped file {}: {err:?}",
-                    mmap2_header.filename
-                );
-            }) else {
-                continue;
-            };
+            let file = File::open(filename_path).map_err(|io_err| {
+                PerfMmapBasedMemoryReaderCreateError::FileIo {
+                    path: filename_path.to_path_buf(),
+                    source: io_err,
+                }
+            })?;
             // SAFETY: check the safety requirements of memmap2 documentation
             let mmap_res = unsafe {
                 MmapOptions::default()
@@ -72,14 +90,16 @@ impl PerfMmapBasedMemoryReader {
                     .offset(mmap2_header.pgoff)
                     .map(&file)
             };
-            let Ok(mmap) = mmap_res.inspect_err(|err| {
-                log::error!("Failed to mmap file {}: {err:?}", mmap2_header.filename);
-            }) else {
-                continue;
-            };
-            if mmap.len() != mmap2_header.len as usize {
-                log::error!("Mismatched mmap length for {}.", mmap2_header.filename);
-                continue;
+            let mmap = mmap_res.map_err(|io_err| PerfMmapBasedMemoryReaderCreateError::FileIo {
+                path: filename_path.to_path_buf(),
+                source: io_err,
+            })?;
+            if mmap.len() as u64 != mmap2_header.len {
+                return Err(PerfMmapBasedMemoryReaderCreateError::FileTooShort {
+                    path: filename_path.to_path_buf(),
+                    expect_length: mmap2_header.len,
+                    real_length: mmap.len() as u64,
+                });
             }
             log::trace!(
                 "Mmaped {:016x}--{:016x}\t{}",
@@ -95,7 +115,7 @@ impl PerfMmapBasedMemoryReader {
 
         entries.sort_by_key(|entry| entry.virtual_address);
 
-        Self { entries }
+        Ok(Self { entries })
     }
 
     /// Get mmaped entries.

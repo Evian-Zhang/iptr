@@ -22,15 +22,20 @@ more_diagnose = []
 ## Enable `HandleControlFlow` implementor fuzz bitmap control flow
 ## handler.
 fuzz_bitmap = []
+perf_memory_reader = ["dep:iptr-perf-pt-reader", "memmap2"]
+libxdc_memory_reader = ["memmap2"]
 
 [lints]
 workspace = true
 
 [dependencies]
 iptr-decoder = { workspace = true }
+iptr-perf-pt-reader = { workspace = true, optional = true }
+memmap2 = { workspace = true, optional = true }
 thiserror = { workspace = true }
 perfect-derive = { workspace = true }
 iced-x86 = { workspace = true }
 hashbrown = { workspace = true }
 zerocopy = { workspace = true, features = ["derive"] }
 derive_hash_fast = { workspace = true }
+log = { workspace = true }
