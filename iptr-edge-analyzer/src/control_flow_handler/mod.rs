@@ -1,12 +1,16 @@
 //! This module contains the core definition of [`HandleControlFlow`] trait,
 //! and several implementors like [`FuzzBitmapControlFlowHandler`][fuzz_bitmap::FuzzBitmapControlFlowHandler].
 
+use derive_more::Display;
+
 pub mod combined;
 #[cfg(feature = "fuzz_bitmap")]
 pub mod fuzz_bitmap;
+#[cfg(all(not(feature = "cache"), feature = "log_control_flow_handler"))]
+pub mod log;
 
 /// Kind of control flow transitions
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Display, Clone, Copy)]
 pub enum ControlFlowTransitionKind {
     /// Conditional Jcc
     ConditionalBranch,
