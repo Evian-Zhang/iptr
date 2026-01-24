@@ -24,13 +24,13 @@ Based on the two decisions described above, the Intel PT format will only record
 
 As the goal of this crate is to re-construct the branch transition sequence, the design of Intel PT format forces us to also **require content of the whole executable memory areas**. Since TNT packets only records the taken/not-taken result of a conditional jump, we need to decode every instruction since a TIP packet to get the target address of every conditional jump, and also re-construct the omitted unconditional jumps/calls.
 
-## Non-cache Usage
+## Non-cache Mode Usage
 
-The whole crate is centered around one struct [`EdgeAnalyzer`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/struct.EdgeAnalyzer.html) and two traits [`HandleControlFlow`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/control_flow_handler/trait.HandleControlFlow.html) and [`ReadMemory`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/memory_reader/trait.ReadMemory.html). `EdgeAnalyzer` implements [`HandlePacket`](https://docs.rs/iptr-decoder/latest/iptr_decoder/trait.HandlePacket.html), and thus can be used with `iptr-decoder`'s [`decode`](https://docs.rs/iptr-decoder/latest/iptr_decoder/fn.decode.html) function to perform decoding on Intel PT traces.
+The whole crate is centered around one struct [`EdgeAnalyzer`][EdgeAnalyzer] and two traits [`HandleControlFlow`][HandleControlFlow] and [`ReadMemory`][ReadMemory]. [`EdgeAnalyzer`][EdgeAnalyzer] implements [`HandlePacket`](https://docs.rs/iptr-decoder/latest/iptr_decoder/trait.HandlePacket.html), and thus can be used with [`iptr-decoder`](https://crates.io/crates/iptr-decoder)'s [`decode`](https://docs.rs/iptr-decoder/latest/iptr_decoder/fn.decode.html) function to perform decoding on Intel PT traces.
 
-An `EdgeAnalyzer` should be created with a struct implementing `HandleControlFlow` and a struct implementing `ReadMemory`. For `HandleControlFlow`, such a struct provides callbacks when a new basic block is encountered. The struct that implementing `ReadMemory` is more important. As mentioned in the preliminary knowledge, this crate needs the content of whole executable memory areas, and that is what `ReadMemory` is for. For simple usage, where the Intel PT trace is recorded by `perf` tool, this crate provides [`PerfMmapBasedMemoryReader`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/memory_reader/perf_mmap/struct.PerfMmapBasedMemoryReader.html) which implements `ReadMemory`. It should be noted that the `perf` tool does not necessarily dump the whole memory content into the `perf.data` file. Instead, the `perf.data` file only records the `mmap` operation. As a result, we need to make sure that all binaries involved should remain unmodified at their original paths, and the `PerfMmapBasedMemoryReader` will reconstruct the memory content according to the paths of `mmap` operations recorded in the `perf.data` file.
+An [`EdgeAnalyzer`][EdgeAnalyzer] should be created with a struct implementing [`HandleControlFlow`][HandleControlFlow] and a struct implementing [`ReadMemory`][ReadMemory]. For [`HandleControlFlow`][HandleControlFlow], such a struct provides callbacks when a new basic block is encountered. The struct that implementing [`ReadMemory`][ReadMemory] is more important. As mentioned in the preliminary knowledge, this crate needs the content of whole executable memory areas, and that is what [`ReadMemory`][ReadMemory] is for. For simple usage, where the Intel PT trace is recorded by `perf` tool, this crate provides [`PerfMmapBasedMemoryReader`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/memory_reader/perf_mmap/struct.PerfMmapBasedMemoryReader.html) which implements [`ReadMemory`][ReadMemory]. It should be noted that the `perf` tool does not necessarily dump the whole memory content into the `perf.data` file. Instead, the `perf.data` file only records the `mmap` operation. As a result, we need to make sure that all binaries involved should remain unmodified at their original paths, and the `PerfMmapBasedMemoryReader` will reconstruct the memory content according to the paths of `mmap` operations recorded in the `perf.data` file.
 
-As a result, a typical usage of `EdgeAnalyzer` to decode Intel-PT traces stored in a `perf.data` file can be minimized into the following code snippet, which utilized [`iptr-perf-pt-reader`](https://crates.io/crates/iptr-perf-pt-reader) to parse `perf.data` file, and [`iptr-decoder`](https://crates.io/crates/iptr-decoder) to drive the `EdegeAnalyzer` for decoding Intel PT traces.
+As a result, a typical usage of [`EdgeAnalyzer`][EdgeAnalyzer] to decode Intel-PT traces stored in a `perf.data` file can be minimized into the following code snippet, which utilized [`iptr-perf-pt-reader`](https://crates.io/crates/iptr-perf-pt-reader) to parse `perf.data` file, and [`iptr-decoder`](https://crates.io/crates/iptr-decoder) to drive the [`EdgeAnalyzer`][EdgeAnalyzer] for decoding Intel PT traces.
 
 ```rust,ignore
 use iptr_decoder::DecodeOptions;
@@ -75,3 +75,36 @@ fn handle_perf_data(perf_data_content: &[u8]) {
     }
 }
 ```
+
+This crate provides a `LogControlFlowHandler`, which has the similar functionalities as the `MyControlFlowHandler` shown above.
+
+`LogControlFlowHandler` can be perfectly integrated into your own workflow with the [`CombinedControlFlowHandler`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/control_flow_handler/combined/struct.CombinedControlFlowHandler.html). This struct also implements [`HandleControlFlow`][HandleControlFlow], and takes two arbitrary structs that implement [`HandleControlFlow`][HandleControlFlow] and combine their functionalities. A typical working example is like below:
+
+```rust,ignore
+use iptr_edge_analyzer::control_flow_handler::{
+    combined::CombinedControlFlowHandler,
+    log::LogControlFlowHandler,
+};
+
+let log_control_flow_handler = LogControlFlowHandler::default();
+let my_control_flow_handler = MyControlFlowHandler;
+let control_flow_handler = CombinedControlFlowHandler::new(
+    log_control_flow_handler,
+    my_control_flow_handler,
+);
+// Use `control_flow_handler` ...
+```
+
+With the pattern shown above, we can easily debug `MyControlFlowHandler` at prototype stage, since the `log_control_flow_handler` can log every block information.
+
+## Cache Mode Usage
+
+This crate has a feature `cache`. When enable this feature, you can enjoy ultra fast Intel PT decoding. The overal design is inspired by [`libxdc`](https://github.com/nyx-fuzz/libxdc). The design is based on the insight that during the execution of a process, there are always a large number of loops, and several functions are invoked multiple times. As a result, some fixed patterns of TIP-TNT packets can be occurred very common. Moreover, in the fuzzing process, the executions between each rounds are also very common. As a result, we can cache the decoding results, and thus boost the performance.
+
+When enabling `cache` feature, you can observe that the definition of [`HandleControlFlow`][HandleControlFlow] has changed, there are new associated types and new methods for users to implement. Although we have modelled the cache-mode control flow handler in a correct and user-friendly manner, it's still challenging to write a correct implementor for cache-mode [`HandleControlFlow`][HandleControlFlow]. So before you want to manually implement [`HandleControlFlow`][HandleControlFlow], you should refer to its documentation and make sure you understand every details. Note that `LogControlFlowHandler` is not available in cache-mode since enabling logging in cache mode will make it slow down dramatically due to the additional storage required to cache, making it meaningless to use cache mode.
+
+We provide a [`FuzzBitmapControlFlowHandler`](https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/control_flow_handler/fuzz_bitmap/FuzzBitmapControlFlowHandler) that implements the cache-mode [`HandleControlFlow`][HandleControlFlow].
+
+[EdgeAnalyzer]: https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/struct.EdgeAnalyzer.html
+[HandleControlFlow]: https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/control_flow_handler/trait.HandleControlFlow.html
+[ReadMemory]: https://docs.rs/iptr-edge-analyzer/latest/iptr_edge_analyzer/memory_reader/trait.ReadMemory.html
