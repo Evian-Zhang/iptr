@@ -1,5 +1,11 @@
 //! This module contains the core definition of [`HandleControlFlow`] trait,
 //! and several implementors like [`FuzzBitmapControlFlowHandler`][fuzz_bitmap::FuzzBitmapControlFlowHandler].
+//!
+//! This module also contains a `LogControlFlowHandler` in the path
+//! `iptr_edge_analyzer::control_flow_handler::log::LogControlFlowHandler`. However, due
+//! to some limitations of rustdoc, this struct cannot be displayed in the documentation.
+//! This struct is only accessible if `log_control_flow_handler` feature is on and `cache`
+//! feature is off.
 
 use derive_more::Display;
 
@@ -18,12 +24,12 @@ pub enum ControlFlowTransitionKind {
     DirectJump,
     /// Direct CALL
     DirectCall,
-    /// Indirect transition
+    /// Indirect transition, including `RET`.
     Indirect,
     /// New block
     ///
     /// Basic blocks that cannot be categorized into
-    /// other reasons
+    /// other reasons. For example, blocks after page fault is resolved.
     NewBlock,
 }
 
@@ -31,6 +37,15 @@ pub enum ControlFlowTransitionKind {
 ///
 /// There are several implementors provided in this crate, such as
 /// [`FuzzBitmapControlFlowHandler`][fuzz_bitmap::FuzzBitmapControlFlowHandler].
+///
+/// # Non-cache mode
+///
+/// For non-cache mode, the usage of this trait is very simple: there are only two methods.
+/// [`at_decode_begin`][HandleControlFlow::at_decode_begin] is invoked at decode begin, and
+/// [`on_new_block`][HandleControlFlow::on_new_block] is invoked every time a basic block is
+/// encountered.
+///
+/// # Cache-mode
 ///
 /// The overall workflow when using this trait is like:
 /// 1. Creating a new handler.
@@ -47,10 +62,16 @@ pub enum ControlFlowTransitionKind {
 /// some examples. For fuzzing, "impact" means modification of fuzzing bitmap, and "cache"
 /// means modification of internal cached information. For logging, "impact" means logging the
 /// basic block transition, and "cache" also means the modification of internal cached information.
+///
+/// It should be noted that, the correctness of implementation of cache-mode [`HandleControlFlow`]
+/// will have no impact on the correctness of cache mechanism used by [`EdgeAnalyzer`][crate::EdgeAnalyzer].
+/// Instead, since [`on_new_block`][HandleControlFlow::on_new_block] is only invoked when a non-cache
+/// basic block is encountered, if you incorrectly implemented this trait, you may not accurately
+/// get all basic blocks.
 pub trait HandleControlFlow {
     /// Error of control flow handler
     type Error: std::error::Error;
-    /// Cached key returned by [`on_new_block`][HandleControlFlow::take_cache].
+    /// Cached key returned by [`take_cache`][HandleControlFlow::take_cache].
     ///
     /// This can be used by the edge analyzer to tell the control flow handler
     /// a previous TNT sequence has been met again and the cache is reused instead
@@ -66,12 +87,18 @@ pub trait HandleControlFlow {
 
     /// Callback when a new basic block is met.
     ///
+    /// For non-cache mode, this function is always invoked no matter whether this
+    /// basic block has been encountered before (i.e., this is not a "unique" block).
+    /// For cache mode, this function is only invoked when a non-cached basic block
+    /// is encountered.
+    ///
     /// The new block's address is `block_addr`, and the reason for getting
-    /// into this block is in `transition_kind`. `cache` indicates whether this
-    /// block transition should be taken into cache by the implementor, which is
-    /// used as an optimizing hint. If `cache` is false, this means this transition
-    /// will never be folded into cache. No matter `cache` is true or false, this
-    /// function should always deal with the impact of new block.
+    /// into this block is in `transition_kind`. `cache` is only used in cache mode,
+    /// which indicates whether this block transition should be taken into cache
+    /// by the implementor, which is used as an optimizing hint. If `cache` is false,
+    /// this means this transition will never be folded into cache.
+    /// No matter `cache` is true or false, this function should always deal with
+    /// the impact of new block.
     ///
     /// When conducting caching, it should be extremely important, that
     /// the cached state should always be consistent with `block_addr`.

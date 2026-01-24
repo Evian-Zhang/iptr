@@ -17,7 +17,7 @@ mod util;
 pub use crate::error::ReaderError;
 use crate::error::ReaderResult;
 
-/// Value of `type`` field for mmaped perf header
+/// Value of `type`` field for mmapped perf header
 const PERF_RECORD_MMAP2: u32 = 10;
 /// Value of `type` field for auxtrace header
 const PERF_RECORD_AUXTRACE: u32 = 71;
@@ -62,7 +62,7 @@ pub fn extract_pt_auxtraces(perf_data: &[u8]) -> ReaderResult<Vec<PerfRecordAuxt
     Ok(pt_auxtraces)
 }
 
-/// Extract raw Intel PT traces alongwith mmaped information from `perf.data`.
+/// Extract raw Intel PT traces alongwith mmapped information from `perf.data`.
 #[expect(clippy::cast_possible_truncation)]
 pub fn extract_pt_auxtraces_and_mmap_data(
     perf_data: &[u8],
@@ -223,7 +223,7 @@ pub struct PerfMmap2Header {
     pub tid: u32,
     /// Target address
     pub addr: u64,
-    /// Mmaped length
+    /// Mmapped length
     pub len: u64,
     /// Offset of file
     pub pgoff: u64,
@@ -231,9 +231,9 @@ pub struct PerfMmap2Header {
     pub inode: [u8; 24],
     /// Permissions
     pub prot: u32,
-    /// Mmaped flags
+    /// Mmapped flags
     pub flags: u32,
-    /// Mmaped filename
+    /// Mmapped filename
     pub filename: String,
 }
 

@@ -1,5 +1,8 @@
+//! Control flow handler that logs.
+
 use crate::HandleControlFlow;
 
+/// Control flow handler that logs every basic block information.
 #[derive(Default)]
 pub struct LogControlFlowHandler {}
 

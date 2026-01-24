@@ -1,5 +1,5 @@
 //! This module contains definition of errors made when analyzing with [`EdgeAnalyzer`][crate::EdgeAnalyzer].
-//!
+
 use perfect_derive::perfect_derive;
 use thiserror::Error;
 

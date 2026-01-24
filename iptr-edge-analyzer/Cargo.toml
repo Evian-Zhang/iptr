@@ -1,11 +1,16 @@
 [package]
 name = "iptr-edge-analyzer"
-description = "Analyze edges in Intel PT data"
-keywords = ["Intel PT"]
-version = { workspace = true }
+description = "Extract edges and branches in Intel PT traces, and construct AFL++-compatible fuzzing bitmaps"
+keywords = ["intel-pt", "aflplusplus", "fuzzing", "bitmap"]
+version = "0.1.0"
+categories = ["parser-implementations", "hardware-support", "security"]
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 default = []
@@ -22,8 +27,11 @@ more_diagnose = []
 ## Enable `HandleControlFlow` implementor fuzz bitmap control flow
 ## handler.
 fuzz_bitmap = []
+## Enable `PerfMmapBasedMemoryReader`
 perf_memory_reader = ["dep:iptr-perf-pt-reader", "dep:memmap2", "dep:log"]
+## Enable `LibxdcMemoryReader`
 libxdc_memory_reader = ["dep:memmap2"]
+## Enable `LogControlFlowHandler`
 log_control_flow_handler = ["dep:log"]
 
 [lints]

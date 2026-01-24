@@ -1,3 +1,6 @@
+//! This module contains a memory reader that re-construct memory content
+//! from addr and dump files used in libxdc experiments.
+
 use std::{fs::File, io::Read, path::Path};
 
 use super::ReadMemory;
@@ -7,22 +10,30 @@ use thiserror::Error;
 const PAGE_CACHE_ADDR_LINE_SIZE: u64 = 8;
 const PAGE_SIZE: usize = 0x1000;
 
+/// Memory reader that re-construct memory content from addr and dump files
+/// used in libxdc experiments
 pub struct LibxdcMemoryReader {
     pages: Mmap,
     page_maps: Vec<(u64, usize)>,
 }
 
+/// Error type for [`LibxdcMemoryReader`], only used in
+/// [`LibxdcMemoryReader::new`].
 #[derive(Debug, Error)]
 pub enum LibxdcMemoryReaderCreateError {
+    /// Failed to open page dump file
     #[error("Failed to open page dump file")]
     InvalidPageDumpFile(#[source] std::io::Error),
+    /// Failed to open page addr file
     #[error("Failed to open page addr file")]
     InvalidPageAddrFile(#[source] std::io::Error),
+    /// Size of page address file is not consistent with page dump file
     #[error("Size of page address file is not consistent with page dump file")]
     InconsistentLength,
 }
 
 impl LibxdcMemoryReader {
+    /// Create a [`LibxdcMemoryReader`] from the page dump and page addr files.
     pub fn new(page_dump: &Path, page_addr: &Path) -> Result<Self, LibxdcMemoryReaderCreateError> {
         let page_dump_file =
             File::open(page_dump).map_err(LibxdcMemoryReaderCreateError::InvalidPageDumpFile)?;
@@ -59,10 +70,13 @@ impl LibxdcMemoryReader {
     }
 }
 
+/// Error type for [`LibxdcMemoryReader`] in the
+/// implementation of [`ReadMemory`]
 #[derive(Debug, Error)]
 pub enum LibxdcMemoryReaderError {
-    #[error("Not mmaped area {0:#x} accessed")]
-    NotMmaped(u64),
+    /// The queried address is not included
+    #[error("Queried area {0:#x} is not included in page.addr file")]
+    NotIncluded(u64),
 }
 
 impl ReadMemory for LibxdcMemoryReader {
@@ -86,7 +100,7 @@ impl ReadMemory for LibxdcMemoryReader {
             Ok(pos) => pos,
             Err(pos) => {
                 if pos == 0 {
-                    return Err(LibxdcMemoryReaderError::NotMmaped(address));
+                    return Err(LibxdcMemoryReaderError::NotIncluded(address));
                 }
                 pos - 1
             }
@@ -99,14 +113,14 @@ impl ReadMemory for LibxdcMemoryReader {
         let read_size = std::cmp::min(size, PAGE_SIZE.saturating_sub(start_offset as usize));
         if read_size == 0 {
             // This includes cases where address - page_addr > PAGE_SIZE
-            return Err(LibxdcMemoryReaderError::NotMmaped(address));
+            return Err(LibxdcMemoryReaderError::NotIncluded(address));
         }
         let content_start = page_content_start + start_offset as usize;
         let Some(mem) = self
             .pages
             .get(content_start..(content_start.saturating_add(read_size)))
         else {
-            return Err(LibxdcMemoryReaderError::NotMmaped(
+            return Err(LibxdcMemoryReaderError::NotIncluded(
                 address.saturating_add(read_size as u64) - 1,
             ));
         };

@@ -15,17 +15,17 @@ This crate provides two main APIs: [`extract_pt_auxtraces`](https://docs.rs/iptr
 
 ```rust
 fn parse_perf_data(perf_data: &[u8]) {
-    let (pt_traces, mmaped_headers) =
+    let (pt_traces, mmapped_headers) =
         iptr_perf_pt_reader::extract_pt_auxtraces_and_mmap_data(perf_data).unwrap();
     for pt_trace in pt_traces {
         println!("Get a PT trace with size {}", pt_trace.size);
         // Real data is in pt_trace.auxtrace_data
     }
-    for mmaped_header in mmaped_headers {
+    for mmapped_header in mmapped_headers {
         println!(
-            "During perf, {} is mmaped to the address {:x}",
-            mmaped_header.filename,
-            mmaped_header.addr,
+            "During perf, {} is mmapped to the address {:x}",
+            mmapped_header.filename,
+            mmapped_header.addr,
         );
     }
 }

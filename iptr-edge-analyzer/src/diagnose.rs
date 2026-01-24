@@ -1,3 +1,5 @@
+//! Module handling diagnostic information.
+
 use crate::{EdgeAnalyzer, HandleControlFlow, ReadMemory};
 
 /// Diagnostic information for [`EdgeAnalyzer`].

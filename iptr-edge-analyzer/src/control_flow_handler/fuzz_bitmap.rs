@@ -47,7 +47,7 @@ const INITIAL_BITMAP_ENTRIES_ARENA_SIZE: usize = 0x100;
 impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
     /// Create a new fuzz bitmap control flow handler.
     ///
-    /// You can pass things like `&mut [u8]`, `Vec<u8>`, `Box<[u8]>`, or even a mmaped structure
+    /// You can pass things like `&mut [u8]`, `Vec<u8>`, `Box<[u8]>`, or even a mmapped structure
     /// as `fuzzing_bitmap`. If you want to give range restrictions, pass `filter_range`,
     /// or you could just pass a [`None`] here to indicate that there is no
     /// range restrictions.
@@ -263,60 +263,8 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
             "Unexpected OOB"
         );
         let bitmap_entries = unsafe { self.bitmap_entries_arena.get_unchecked(entries_range) };
-        let (bitmap_entries_batch, rem) = bitmap_entries.as_chunks();
-        for [entry0, entry1, entry2, entry3] in bitmap_entries_batch {
-            let bitmap_index0 = entry0.bitmap_index();
-            let bitmap_count0 = entry0.bitmap_count();
-            let bitmap_index1 = entry1.bitmap_index();
-            let bitmap_count1 = entry1.bitmap_count();
-            let bitmap_index2 = entry2.bitmap_index();
-            let bitmap_count2 = entry2.bitmap_count();
-            let bitmap_index3 = entry3.bitmap_index();
-            let bitmap_count3 = entry3.bitmap_count();
-            debug_assert!(
-                bitmap_index0 < self.fuzzing_bitmap.as_ref().len(),
-                "Unexpected OOB"
-            );
-            debug_assert!(
-                bitmap_index1 < self.fuzzing_bitmap.as_ref().len(),
-                "Unexpected OOB"
-            );
-            debug_assert!(
-                bitmap_index2 < self.fuzzing_bitmap.as_ref().len(),
-                "Unexpected OOB"
-            );
-            debug_assert!(
-                bitmap_index3 < self.fuzzing_bitmap.as_ref().len(),
-                "Unexpected OOB"
-            );
-
-            let count = unsafe {
-                self.fuzzing_bitmap
-                    .as_mut()
-                    .get_unchecked_mut(bitmap_index0)
-            };
-            *count = count.wrapping_add(bitmap_count0);
-            let count = unsafe {
-                self.fuzzing_bitmap
-                    .as_mut()
-                    .get_unchecked_mut(bitmap_index1)
-            };
-            *count = count.wrapping_add(bitmap_count1);
-            let count = unsafe {
-                self.fuzzing_bitmap
-                    .as_mut()
-                    .get_unchecked_mut(bitmap_index2)
-            };
-            *count = count.wrapping_add(bitmap_count2);
-            let count = unsafe {
-                self.fuzzing_bitmap
-                    .as_mut()
-                    .get_unchecked_mut(bitmap_index3)
-            };
-            *count = count.wrapping_add(bitmap_count3);
-        }
-
-        for bitmap_entry in rem {
+        // FIXME: This loop should be unrolled, but there is a bug in LLVM: https://github.com/rust-lang/rust/issues/150647
+        for bitmap_entry in bitmap_entries {
             let bitmap_index = bitmap_entry.bitmap_index();
             debug_assert!(
                 bitmap_index < self.fuzzing_bitmap.as_ref().len(),

@@ -28,7 +28,6 @@ iptr-edge-analyzer = { workspace = true, features = [
 ] }
 clap = { workspace = true, features = ["derive"] }
 memmap2 = { workspace = true }
-thiserror = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 env_logger = { workspace = true }

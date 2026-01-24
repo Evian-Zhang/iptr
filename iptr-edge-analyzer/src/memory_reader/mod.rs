@@ -1,3 +1,6 @@
+//! This module contains the core definition of [`ReadMemory`] trait,
+//! and several implementors like [`PerfMmapBasedMemoryReader`][perf_mmap::PerfMmapBasedMemoryReader].
+
 #[cfg(feature = "libxdc_memory_reader")]
 pub mod libxdc;
 #[cfg(feature = "perf_memory_reader")]
@@ -18,7 +21,8 @@ pub trait ReadMemory {
     /// invoke the given callback with the read memories.
     ///
     /// This function is allowed to read memories shorter than
-    /// `size`.
+    /// `size`. The length of read bytes should be determined from users
+    /// by check the length of `&[u8]` at callback.
     ///
     /// This function will return the callback return value on success.
     fn read_memory<T>(

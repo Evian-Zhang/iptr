@@ -48,13 +48,13 @@ fn main() -> Result<()> {
         BufWriter::new(File::create(page_addr).context("Failed to create page addr file")?);
 
     let mut page_buf = [0u8; PAGE_SIZE];
-    for mmaped_entry in memory_reader.mmapped_entries() {
+    for mmapped_entry in memory_reader.mmapped_entries() {
         log::info!(
-            "Writing mmaped entry at {:#x} with size {:#x}",
-            mmaped_entry.virtual_address(),
-            mmaped_entry.content().len()
+            "Writing mmapped entry at {:#x} with size {:#x}",
+            mmapped_entry.virtual_address(),
+            mmapped_entry.content().len()
         );
-        let content = mmaped_entry.content();
+        let content = mmapped_entry.content();
         let complete_page_count = content.len() / PAGE_SIZE;
         let complete_page_size = PAGE_SIZE * complete_page_count;
         let complete_page = content.get(0..complete_page_size).expect("Unexpected!");
@@ -63,7 +63,7 @@ fn main() -> Result<()> {
             .context("Failed to write to page dump file")?;
 
         for page_count in 0..complete_page_count {
-            let page_addr = mmaped_entry.virtual_address() + (page_count * PAGE_SIZE) as u64;
+            let page_addr = mmapped_entry.virtual_address() + (page_count * PAGE_SIZE) as u64;
             page_addr_file
                 .write_all(&page_addr.to_le_bytes())
                 .context("Failed to write to page addr file")?;
@@ -89,7 +89,7 @@ fn main() -> Result<()> {
                 .context("Failed to write to page dump file")?;
 
             let page_addr =
-                mmaped_entry.virtual_address() + (complete_page_count * PAGE_SIZE) as u64;
+                mmapped_entry.virtual_address() + (complete_page_count * PAGE_SIZE) as u64;
             page_addr_file
                 .write_all(&page_addr.to_le_bytes())
                 .context("Failed to write to page addr file")?;
