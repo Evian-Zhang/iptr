@@ -15,4 +15,16 @@ This repository is organized in the following structure, please refer to individ
    Extract necessary information from `perf.data`.
 * tools
 
-   Example tools of using this project.
+   Example tools of using this project. Useful tools including:
+   * [`iptr-raw-logger`](./tools/iptr-raw-logger/README.md)
+
+      Decode and log details for Intel PT packets
+   * [`iptr-perf-pt-extractor`](./tools/iptr-perf-pt-extractor/README.md)
+
+      Extract raw Intel PT trace from `perf.data` file.
+   * [`iptr-perf-pt-analyzer`](./tools/iptr-perf-pt-analyzer/README.md)
+
+      Decode the Intel PT trace in perf.data file with semantic validation.
+   * [`iptr-perf-memory-extractor`](./tools/iptr-perf-memory-extractor/README.md)
+
+      Extract memory content in `perf.data` file into libxdc experiments format.

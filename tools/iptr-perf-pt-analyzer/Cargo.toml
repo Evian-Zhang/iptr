@@ -1,8 +1,9 @@
 [package]
 name = "iptr-perf-pt-analyzer"
-version = { workspace = true }
+description = "Decode the Intel PT trace in perf.data file with semantic validation."
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
 
 [lints]
@@ -10,9 +11,8 @@ workspace = true
 
 [features]
 default = []
-debug = [
-  "iptr-decoder/log_handler",
-] # Enable debug logging for each low level packets
+## Enable debug logging for each low level packets
+debug = ["iptr-decoder/log_handler"]
 
 [dependencies]
 iptr-decoder = { workspace = true }

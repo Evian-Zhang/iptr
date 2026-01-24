@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "iptr-perf-memory-extractor"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "iptr-perf-pt-analyzer"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -346,7 +346,7 @@ dependencies = [
 
 [[package]]
 name = "iptr-perf-pt-extractor"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -365,7 +365,7 @@ dependencies = [
 
 [[package]]
 name = "iptr-raw-logger"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap",

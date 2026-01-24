@@ -1,10 +1,10 @@
 [package]
 name = "iptr-perf-memory-extractor"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-readme.workspace = true
+description = "Extract memory content in perf.data into libxdc experiments format."
+edition = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
 
 [dependencies]
 iptr-edge-analyzer = { workspace = true, features = ["perf_memory_reader"] }

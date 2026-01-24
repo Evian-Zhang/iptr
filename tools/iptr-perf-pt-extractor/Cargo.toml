@@ -1,10 +1,9 @@
 [package]
 name = "iptr-perf-pt-extractor"
 description = "Tool to extract Intel PT AUXTRACE from perf.data"
-keywords = ["Intel PT", "perf", "perf.data"]
-version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
+homepage = { workspace = true }
 repository = { workspace = true }
 
 [lints]
