@@ -149,7 +149,9 @@ fn handle_long_tnt_packet<H: HandlePacket>(
     // SAFETY: Trailing 1 guarantees the nonzero
     let packet_bytes = unsafe { NonZero::new_unchecked(packet_bytes) };
 
-    debug_assert!(leading_zeros > 64 - 16 - 1, "Invalid long TNT packet"); // The two bytes header and Stop bit
+    // Leading zeros must <= 64-16. And we have checked it is not equal
+    // to 64-16, so it <= 64 - 16 -1
+    debug_assert!(leading_zeros <= 64 - 16 - 1, "Unexpected");
     let highest_bit = 46u32.wrapping_sub(leading_zeros); // (63-index) - (trailing 1) - (16 length of header)
     debug_assert!(highest_bit <= 46 || highest_bit == u32::MAX, "Unexpected");
 
