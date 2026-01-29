@@ -366,8 +366,8 @@ fn handle_cyc_packet<H: HandlePacket>(
         end_pos += 1;
     }
 
-    // SAFETY: All bytes are accessed before.
-    debug_assert!(buf.len() > end_pos, "Unexpected");
+    // SAFETY: All bytes are accessed before, end_pos is exclusive
+    debug_assert!(buf.len() >= end_pos, "Unexpected");
     packet_handler
         .on_cyc_packet(context, unsafe { buf.get_unchecked(context.pos..end_pos) })
         .map_err(DecoderError::PacketHandler)?;
