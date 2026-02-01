@@ -152,16 +152,6 @@ impl<H: HandleControlFlow, R: ReadMemory> EdgeAnalyzer<H, R> {
         &self.reader
     }
 
-    /// Get unique reference to control flow handler
-    pub fn handler_mut(&mut self) -> &mut H {
-        &mut self.handler
-    }
-
-    /// Get unique reference to memory reader
-    pub fn reader_mut(&mut self) -> &mut R {
-        &mut self.reader
-    }
-
     /// Perform IP reconstruction and update the `last_ip` field,
     /// returns the full-width IP address
     fn reconstruct_ip_and_update_last(
