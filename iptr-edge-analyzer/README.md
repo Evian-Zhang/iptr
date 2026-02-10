@@ -155,6 +155,7 @@ This crate has the following features:
 
    This feature is not enabled by default.
 * `log_control_flow_handler`
+
    Enable `LogControlFlowHandler`. This struct implements [`HandleControlFlow`][HandleControlFlow] and will log basic block information at each callback. Note that the struct is only enabled if `cache` feature is not enabled.
 
    This feature is not enabled by default.

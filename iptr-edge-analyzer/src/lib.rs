@@ -349,6 +349,17 @@ where
         self.reader
             .at_decode_begin()
             .map_err(AnalyzerError::MemoryReader)?;
+        #[cfg(feature = "cache")]
+        {
+            if self
+                .handler
+                .should_clear_all_cache()
+                .map_err(AnalyzerError::ControlFlowHandler)?
+                || self.cache_manager.should_clear_all_cache()
+            {
+                self.cache_manager.clear_all_cache();
+            }
+        }
         #[cfg(all(feature = "cache", feature = "more_diagnose"))]
         {
             self.cache_32bit_hit_count = 0;

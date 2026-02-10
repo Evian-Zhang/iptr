@@ -43,6 +43,12 @@ const INITIAL_RESULTS_PER_CACHE: usize = 64;
 /// Initial size of [`bitmap_entries_arena`][FuzzBitmapControlFlowHandler::bitmap_entries_arena].
 #[cfg(feature = "cache")]
 const INITIAL_BITMAP_ENTRIES_ARENA_SIZE: usize = 0x100;
+/// Max size of [`bitmap_entries_arena`][FuzzBitmapControlFlowHandler::bitmap_entries_arena].
+///
+/// If the bitmap entries have exceeded this size, the control flow handler will require
+/// to clear cache in the next round. This is much like a STW "GC".
+#[cfg(feature = "cache")]
+const BITMAP_ENTRIES_ARENA_MAX_SIZE: usize = 0x0FFF_FFFF;
 
 impl<M: AsRef<[u8]> + AsMut<[u8]>> FuzzBitmapControlFlowHandler<M> {
     /// Create a new fuzz bitmap control flow handler.
@@ -276,6 +282,16 @@ impl<M: AsRef<[u8]> + AsMut<[u8]>> HandleControlFlow for FuzzBitmapControlFlowHa
         self.set_new_loc(new_bb);
 
         Ok(())
+    }
+
+    #[cfg(feature = "cache")]
+    fn should_clear_all_cache(&mut self) -> Result<bool, Self::Error> {
+        if self.bitmap_entries_arena.len() < BITMAP_ENTRIES_ARENA_MAX_SIZE {
+            return Ok(false);
+        }
+        self.bitmap_entries_arena.clear();
+
+        Ok(true)
     }
 }
 

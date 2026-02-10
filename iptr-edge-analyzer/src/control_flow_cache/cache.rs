@@ -87,7 +87,13 @@ pub struct ControlFlowCacheManager<D> {
     cache_trailing_bits: HashMap<ControlFlowSequenceTrailBits, CachableInformation<D>>,
 }
 
+/// Initial capacity for each cache hash map
 const CACHE_MAP_INITIAL_CAPACITY: usize = 0x100;
+/// Max size for each cache hash map.
+///
+/// This will be checked at each decode begin. If the cache size exceeds this value,
+/// the all caches will be cleared.
+const CACHE_MAP_MAX_SIZE: usize = 0x0FFF_FFFF;
 
 impl<D> Default for ControlFlowCacheManager<D> {
     fn default() -> Self {
@@ -104,6 +110,20 @@ impl<D> ControlFlowCacheManager<D> {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// OOM check
+    pub fn should_clear_all_cache(&self) -> bool {
+        self.cache8.len() > CACHE_MAP_MAX_SIZE
+            || self.cache32.len() > CACHE_MAP_MAX_SIZE
+            || self.cache_trailing_bits.len() > CACHE_MAP_MAX_SIZE
+    }
+
+    /// Clear all caches
+    pub fn clear_all_cache(&mut self) {
+        self.cache8.clear();
+        self.cache32.clear();
+        self.cache_trailing_bits.clear();
     }
 
     /// Get the size of trailing bits cache, 8bit cache and 32bit cache, respectively

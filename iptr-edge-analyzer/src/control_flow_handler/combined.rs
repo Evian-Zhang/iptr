@@ -163,4 +163,26 @@ where
 
         Ok(())
     }
+
+    /// In combined control flow handler, this function is special since
+    /// it is possible that one of the two handlers wants to clear
+    /// all caches while the other does not.
+    ///
+    /// In this case (any of the two sub handlers want to clear cache),
+    /// the function will return `true`. The invalidation of cached keys
+    /// should not affect the correctness of handlers. So even if another
+    /// handler does not want to clear cache, it should still work correctly.
+    #[cfg(feature = "cache")]
+    fn should_clear_all_cache(&mut self) -> Result<bool, Self::Error> {
+        let should_clear1 = self
+            .handler1
+            .should_clear_all_cache()
+            .map_err(CombinedError::H1Error)?;
+        let should_clear2 = self
+            .handler2
+            .should_clear_all_cache()
+            .map_err(CombinedError::H2Error)?;
+
+        Ok(should_clear1 || should_clear2)
+    }
 }

@@ -150,4 +150,18 @@ pub trait HandleControlFlow {
         cached_key: &Self::CachedKey,
         new_bb: u64,
     ) -> Result<(), Self::Error>;
+
+    /// Callback to check whether all caches in
+    /// [`EdgeAnalyzer`][crate::EdgeAnalyzer] should be cleared.
+    ///
+    /// This is useful to avoid the cache being too large, leading
+    /// to out-of-memory issues.
+    ///
+    /// If this function returns `true`, the control flow handler
+    /// should clear its own caches as well. All previous cached keys
+    /// are guaranteed to be invalid.
+    ///
+    /// This function will be invoked at decode begin.
+    #[cfg(feature = "cache")]
+    fn should_clear_all_cache(&mut self) -> Result<bool, Self::Error>;
 }

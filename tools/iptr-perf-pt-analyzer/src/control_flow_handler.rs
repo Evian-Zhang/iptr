@@ -39,4 +39,8 @@ impl HandleControlFlow for PerfAnalyzerControlFlowHandler {
     ) -> Result<(), Self::Error> {
         Ok(())
     }
+
+    fn should_clear_all_cache(&mut self) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
 }
