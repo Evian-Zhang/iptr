@@ -2,7 +2,7 @@
 name = "iptr-edge-analyzer"
 description = "Extract edges and branches in Intel PT traces, and construct AFL++-compatible fuzzing bitmaps"
 keywords = ["intel-pt", "aflplusplus", "fuzzing", "bitmap"]
-version = "0.2.0"
+version = "0.3.0"
 categories = ["parser-implementations", "hardware-support", "security"]
 edition = { workspace = true }
 license = { workspace = true }

@@ -6,7 +6,7 @@ To use this crate, add this crate to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-iptr-edge-analyzer = "0.1"
+iptr-edge-analyzer = "0.3"
 ```
 
 ## Preliminary Knowledge

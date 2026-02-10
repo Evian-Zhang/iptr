@@ -13,7 +13,7 @@ members = [
 
 [workspace.dependencies]
 iptr-decoder = { path = "./iptr-decoder", version = "0.1" }
-iptr-edge-analyzer = { path = "./iptr-edge-analyzer", version = "0.2" }
+iptr-edge-analyzer = { path = "./iptr-edge-analyzer", version = "0.3" }
 iptr-perf-pt-reader = { path = "./iptr-perf-pt-reader", version = "0.1" }
 
 thiserror = "2"
