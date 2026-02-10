@@ -125,6 +125,7 @@ fn handle_trace_stop_packet<H: HandlePacket>(
 }
 
 #[inline]
+#[expect(clippy::int_plus_one)]
 fn handle_long_tnt_packet<H: HandlePacket>(
     buf: &[u8],
     _byte: u8,

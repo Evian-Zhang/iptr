@@ -35,4 +35,4 @@ jobs:
     - name: Run tests
       run: cargo hack test --workspace --all-features --verbose
     - name: Run clippy
-      run: cargo hack clippy --workspace --feature-powerset --no-dev-deps --verbose
+      run: cargo hack clippy --workspace --feature-powerset --no-dev-deps --verbose -- -Dwarnings
