@@ -1,0 +1,24 @@
+[package]
+name = "iptr-decoder-fuzz"
+publish = false
+edition = { workspace = true }
+license = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+touched = "0.1"
+
+[dependencies.iptr-decoder]
+workspace = true
+
+[[bin]]
+name = "fuzz_target_1"
+path = "fuzz_targets/fuzz_target_1.rs"
+test = false
+doc = false
+bench = false

@@ -9,6 +9,7 @@ members = [
   "tools/iptr-perf-pt-analyzer",
   "tools/iptr-perf-pt-extractor",
   "tools/iptr-raw-logger",
+  "iptr-decoder/fuzz"
 ]
 
 [workspace.dependencies]
